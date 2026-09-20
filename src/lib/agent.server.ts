@@ -34,7 +34,8 @@ export async function logAgentEvent(entry: {
   device_id?: string | null;
   user_id?: string | null;
   session_id?: string | null;
-  details?: Record<string, unknown> | null;
+  details?: Record<string, string | number | boolean | null>;
 }) {
-  await supabaseAdmin.from("audit_log").insert(entry);
+  await supabaseAdmin.from("audit_log").insert(entry as never);
 }
+

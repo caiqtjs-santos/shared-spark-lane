@@ -111,7 +111,7 @@ function TiView({ data }: { data: Workspace }) {
 
   const create = useMutation({
     mutationFn: useServerFn(createDevice),
-    onSuccess: (res) => {
+    onSuccess: (res: { deviceId: string; enrollmentToken: string }) => {
       setPendingToken({ id: res.deviceId, token: res.enrollmentToken });
       toast.success("Aparelho cadastrado. Envie o código de ativação para o profissional.");
       invalidate();
