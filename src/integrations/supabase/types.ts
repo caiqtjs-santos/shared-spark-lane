@@ -14,16 +14,197 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      access_sessions: {
+        Row: {
+          device_id: string
+          ended_at: string | null
+          id: string
+          mode: string
+          reason: string
+          requested_by_user_id: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          device_id: string
+          ended_at?: string | null
+          id?: string
+          mode: string
+          reason: string
+          requested_by_user_id: string
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          device_id?: string
+          ended_at?: string | null
+          id?: string
+          mode?: string
+          reason?: string
+          requested_by_user_id?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_sessions_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_log: {
+        Row: {
+          created_at: string
+          details: Json | null
+          device_id: string | null
+          event_type: string
+          id: string
+          session_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          device_id?: string | null
+          event_type: string
+          id?: string
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          device_id?: string | null
+          event_type?: string
+          id?: string
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "access_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      devices: {
+        Row: {
+          battery_level: number | null
+          created_at: string
+          device_secret: string | null
+          enrolled_at: string | null
+          enrolled_by_user_id: string | null
+          enrollment_status: string
+          enrollment_token: string | null
+          id: string
+          last_seen_at: string | null
+          model: string
+          name: string
+          owner_user_id: string | null
+          push_token: string | null
+        }
+        Insert: {
+          battery_level?: number | null
+          created_at?: string
+          device_secret?: string | null
+          enrolled_at?: string | null
+          enrolled_by_user_id?: string | null
+          enrollment_status?: string
+          enrollment_token?: string | null
+          id?: string
+          last_seen_at?: string | null
+          model: string
+          name: string
+          owner_user_id?: string | null
+          push_token?: string | null
+        }
+        Update: {
+          battery_level?: number | null
+          created_at?: string
+          device_secret?: string | null
+          enrolled_at?: string | null
+          enrolled_by_user_id?: string | null
+          enrollment_status?: string
+          enrollment_token?: string | null
+          id?: string
+          last_seen_at?: string | null
+          model?: string
+          name?: string
+          owner_user_id?: string | null
+          push_token?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          login_code: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          login_code: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          login_code?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "profissional" | "ti"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +331,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["profissional", "ti"],
+    },
   },
 } as const
