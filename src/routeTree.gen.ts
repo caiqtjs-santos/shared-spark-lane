@@ -10,33 +10,109 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated/painel'
+import { Route as ApiPublicAgentEnrollRouteImport } from './routes/api/public/agent/enroll'
+import { Route as ApiPublicAgentHeartbeatRouteImport } from './routes/api/public/agent/heartbeat'
+import { Route as ApiPublicAgentSessionRouteImport } from './routes/api/public/agent/session'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedPainelRoute = AuthenticatedPainelRouteImport.update({
+  id: '/painel',
+  path: '/painel',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const ApiPublicAgentEnrollRoute = ApiPublicAgentEnrollRouteImport.update({
+  id: '/api/public/agent/enroll',
+  path: '/api/public/agent/enroll',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicAgentHeartbeatRoute = ApiPublicAgentHeartbeatRouteImport.update({
+  id: '/api/public/agent/heartbeat',
+  path: '/api/public/agent/heartbeat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicAgentSessionRoute = ApiPublicAgentSessionRouteImport.update({
+  id: '/api/public/agent/session',
+  path: '/api/public/agent/session',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/painel': typeof AuthenticatedPainelRoute
+  '/api/public/agent/enroll': typeof ApiPublicAgentEnrollRoute
+  '/api/public/agent/heartbeat': typeof ApiPublicAgentHeartbeatRoute
+  '/api/public/agent/session': typeof ApiPublicAgentSessionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/painel': typeof AuthenticatedPainelRoute
+  '/api/public/agent/enroll': typeof ApiPublicAgentEnrollRoute
+  '/api/public/agent/heartbeat': typeof ApiPublicAgentHeartbeatRoute
+  '/api/public/agent/session': typeof ApiPublicAgentSessionRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/_authenticated/painel': typeof AuthenticatedPainelRoute
+  '/api/public/agent/enroll': typeof ApiPublicAgentEnrollRoute
+  '/api/public/agent/heartbeat': typeof ApiPublicAgentHeartbeatRoute
+  '/api/public/agent/session': typeof ApiPublicAgentSessionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/painel'
+    | '/api/public/agent/enroll'
+    | '/api/public/agent/heartbeat'
+    | '/api/public/agent/session'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/auth'
+    | '/painel'
+    | '/api/public/agent/enroll'
+    | '/api/public/agent/heartbeat'
+    | '/api/public/agent/session'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/_authenticated/painel'
+    | '/api/public/agent/enroll'
+    | '/api/public/agent/heartbeat'
+    | '/api/public/agent/session'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
+  ApiPublicAgentEnrollRoute: typeof ApiPublicAgentEnrollRoute
+  ApiPublicAgentHeartbeatRoute: typeof ApiPublicAgentHeartbeatRoute
+  ApiPublicAgentSessionRoute: typeof ApiPublicAgentSessionRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +124,69 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/painel': {
+      id: '/_authenticated/painel'
+      path: '/painel'
+      fullPath: '/painel'
+      preLoaderRoute: typeof AuthenticatedPainelRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/public/agent/enroll': {
+      id: '/api/public/agent/enroll'
+      path: '/api/public/agent/enroll'
+      fullPath: '/api/public/agent/enroll'
+      preLoaderRoute: typeof ApiPublicAgentEnrollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/agent/heartbeat': {
+      id: '/api/public/agent/heartbeat'
+      path: '/api/public/agent/heartbeat'
+      fullPath: '/api/public/agent/heartbeat'
+      preLoaderRoute: typeof ApiPublicAgentHeartbeatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/agent/session': {
+      id: '/api/public/agent/session'
+      path: '/api/public/agent/session'
+      fullPath: '/api/public/agent/session'
+      preLoaderRoute: typeof ApiPublicAgentSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedPainelRoute: typeof AuthenticatedPainelRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedPainelRoute: AuthenticatedPainelRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
+  ApiPublicAgentEnrollRoute: ApiPublicAgentEnrollRoute,
+  ApiPublicAgentHeartbeatRoute: ApiPublicAgentHeartbeatRoute,
+  ApiPublicAgentSessionRoute: ApiPublicAgentSessionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
