@@ -80,7 +80,7 @@ function InstalarPage() {
                 {data.name} · {data.model}
               </p>
 
-              <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+              <div className="mt-4 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-foreground">
                 Confirme que você está abrindo esta página no navegador do próprio celular que
                 quer poder acessar remotamente — não em outro computador.
               </div>

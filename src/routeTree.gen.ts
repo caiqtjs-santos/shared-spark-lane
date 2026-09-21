@@ -13,6 +13,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated/painel'
+import { Route as InstalarTokenRouteImport } from './routes/instalar/$token'
+import { Route as ApiPublicAgentDeviceInfoRouteImport } from './routes/api/public/agent/device-info'
 import { Route as ApiPublicAgentEnrollRouteImport } from './routes/api/public/agent/enroll'
 import { Route as ApiPublicAgentHeartbeatRouteImport } from './routes/api/public/agent/heartbeat'
 import { Route as ApiPublicAgentSessionRouteImport } from './routes/api/public/agent/session'
@@ -36,6 +38,17 @@ const AuthenticatedPainelRoute = AuthenticatedPainelRouteImport.update({
   path: '/painel',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const InstalarTokenRoute = InstalarTokenRouteImport.update({
+  id: '/instalar/$token',
+  path: '/instalar/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicAgentDeviceInfoRoute =
+  ApiPublicAgentDeviceInfoRouteImport.update({
+    id: '/api/public/agent/device-info',
+    path: '/api/public/agent/device-info',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicAgentEnrollRoute = ApiPublicAgentEnrollRouteImport.update({
   id: '/api/public/agent/enroll',
   path: '/api/public/agent/enroll',
@@ -56,6 +69,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/painel': typeof AuthenticatedPainelRoute
+  '/instalar/$token': typeof InstalarTokenRoute
+  '/api/public/agent/device-info': typeof ApiPublicAgentDeviceInfoRoute
   '/api/public/agent/enroll': typeof ApiPublicAgentEnrollRoute
   '/api/public/agent/heartbeat': typeof ApiPublicAgentHeartbeatRoute
   '/api/public/agent/session': typeof ApiPublicAgentSessionRoute
@@ -64,6 +79,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/painel': typeof AuthenticatedPainelRoute
+  '/instalar/$token': typeof InstalarTokenRoute
+  '/api/public/agent/device-info': typeof ApiPublicAgentDeviceInfoRoute
   '/api/public/agent/enroll': typeof ApiPublicAgentEnrollRoute
   '/api/public/agent/heartbeat': typeof ApiPublicAgentHeartbeatRoute
   '/api/public/agent/session': typeof ApiPublicAgentSessionRoute
@@ -74,6 +91,8 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/painel': typeof AuthenticatedPainelRoute
+  '/instalar/$token': typeof InstalarTokenRoute
+  '/api/public/agent/device-info': typeof ApiPublicAgentDeviceInfoRoute
   '/api/public/agent/enroll': typeof ApiPublicAgentEnrollRoute
   '/api/public/agent/heartbeat': typeof ApiPublicAgentHeartbeatRoute
   '/api/public/agent/session': typeof ApiPublicAgentSessionRoute
@@ -84,6 +103,8 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/painel'
+    | '/instalar/$token'
+    | '/api/public/agent/device-info'
     | '/api/public/agent/enroll'
     | '/api/public/agent/heartbeat'
     | '/api/public/agent/session'
@@ -92,6 +113,8 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/painel'
+    | '/instalar/$token'
+    | '/api/public/agent/device-info'
     | '/api/public/agent/enroll'
     | '/api/public/agent/heartbeat'
     | '/api/public/agent/session'
@@ -101,6 +124,8 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/painel'
+    | '/instalar/$token'
+    | '/api/public/agent/device-info'
     | '/api/public/agent/enroll'
     | '/api/public/agent/heartbeat'
     | '/api/public/agent/session'
@@ -110,6 +135,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  InstalarTokenRoute: typeof InstalarTokenRoute
+  ApiPublicAgentDeviceInfoRoute: typeof ApiPublicAgentDeviceInfoRoute
   ApiPublicAgentEnrollRoute: typeof ApiPublicAgentEnrollRoute
   ApiPublicAgentHeartbeatRoute: typeof ApiPublicAgentHeartbeatRoute
   ApiPublicAgentSessionRoute: typeof ApiPublicAgentSessionRoute
@@ -144,6 +171,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/painel'
       preLoaderRoute: typeof AuthenticatedPainelRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/instalar/$token': {
+      id: '/instalar/$token'
+      path: '/instalar/$token'
+      fullPath: '/instalar/$token'
+      preLoaderRoute: typeof InstalarTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/agent/device-info': {
+      id: '/api/public/agent/device-info'
+      path: '/api/public/agent/device-info'
+      fullPath: '/api/public/agent/device-info'
+      preLoaderRoute: typeof ApiPublicAgentDeviceInfoRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/agent/enroll': {
       id: '/api/public/agent/enroll'
@@ -184,6 +225,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  InstalarTokenRoute: InstalarTokenRoute,
+  ApiPublicAgentDeviceInfoRoute: ApiPublicAgentDeviceInfoRoute,
   ApiPublicAgentEnrollRoute: ApiPublicAgentEnrollRoute,
   ApiPublicAgentHeartbeatRoute: ApiPublicAgentHeartbeatRoute,
   ApiPublicAgentSessionRoute: ApiPublicAgentSessionRoute,
