@@ -2,9 +2,9 @@ name: Build APK
 
 # Compila o app Android de verdade nos servidores do GitHub (que já vêm
 # com o Android SDK pronto) sempre que este código for enviado ao
-# repositório. O .apk resultante fica disponível para download na aba
-# "Actions" > a execução mais recente > "Artifacts", sem precisar de
-# Android Studio nem de nada instalado na sua máquina.
+# repositório, e publica o .apk resultante dentro do próprio site
+# (public/app/meu-celular-agente.apk) para virar um link de download
+# real e permanente - sem precisar de login no GitHub para baixar.
 on:
   push:
     paths:
@@ -12,12 +12,12 @@ on:
       - ".github/workflows/build-apk.yml"
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: android-agent
     steps:
       - uses: actions/checkout@v4
 
@@ -28,14 +28,33 @@ jobs:
           java-version: "17"
 
       - name: Dar permissão de execução ao gradlew
+        working-directory: android-agent
         run: chmod +x ./gradlew
 
       - name: Compilar o APK de debug
+        working-directory: android-agent
         run: ./gradlew assembleDebug --stacktrace
 
-      - name: Publicar o APK como artefato para download
+      - name: Publicar o APK como artefato do Actions (histórico de builds)
         uses: actions/upload-artifact@v4
         with:
           name: meu-celular-agente-debug
           path: android-agent/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Copiar o APK para dentro do site (public/app)
+        run: |
+          mkdir -p public/app
+          cp android-agent/app/build/outputs/apk/debug/app-debug.apk public/app/meu-celular-agente.apk
+
+      - name: Publicar o APK de volta no repositório
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/app/meu-celular-agente.apk
+          if git diff --cached --quiet; then
+            echo "APK sem mudanças - nada para publicar."
+          else
+            git commit -m "chore: publicar novo build do app Android [skip ci]"
+            git push
+          fi
