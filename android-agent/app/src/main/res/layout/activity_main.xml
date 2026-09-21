@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:id="@+id/textTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/app_name"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/textManagedNotice"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:padding="12dp"
+        android:background="#F1F5F9"
+        android:text="Aparelho gerenciado pela empresa"
+        android:textColor="#334155" />
+
+    <TextView
+        android:id="@+id/textStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="Este aparelho ainda não foi ativado."
+        android:textSize="16sp" />
+
+    <!-- Fluxo de ativação: visível só antes do enrollment. O link de
+         /instalar/<token> contém o token no final da URL; o profissional
+         cola o link inteiro ou só o token aqui. -->
+    <LinearLayout
+        android:id="@+id/groupEnroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="16dp">
+
+        <EditText
+            android:id="@+id/inputToken"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Cole aqui o link ou o token de ativação"
+            android:inputType="textUri" />
+
+        <Button
+            android:id="@+id/buttonActivate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Ativar este aparelho" />
+    </LinearLayout>
+
+    <!-- Fluxo pós-ativação: visível só depois do enrollment. -->
+    <LinearLayout
+        android:id="@+id/groupEnrolled"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="16dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/textSessionStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Sem sessão de acesso remoto ativa" />
+
+        <Button
+            android:id="@+id/buttonDeactivate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Remover a gestão deste aparelho (teste)" />
+    </LinearLayout>
+
+</LinearLayout>

@@ -10,6 +10,12 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 
+    <!-- SessionWatcherService: consulta periódica de sessão + heartbeat -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <!-- Notificação de sessão ativa (obrigatória a partir do Android 13) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Bateria/status exibidos no painel -->
     <uses-permission android:name="android.permission.BATTERY_STATS" tools:ignore="ProtectedPermissions" />
 
@@ -65,6 +71,17 @@
         <service
             android:name=".ScreenCaptureService"
             android:foregroundServiceType="mediaProjection"
+            android:exported="false" />
+
+        <!--
+          Consulta periodica (a cada 15s) se ha sessao de acesso ativa e
+          liga/desliga a notificacao permanente de acordo - e o mecanismo
+          de consentimento visivel funcionando de ponta a ponta, mesmo
+          antes de a espelhagem de tela em si existir.
+        -->
+        <service
+            android:name=".SessionWatcherService"
+            android:foregroundServiceType="dataSync"
             android:exported="false" />
 
         <!--
