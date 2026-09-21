@@ -1,0 +1,41 @@
+name: Build APK
+
+# Compila o app Android de verdade nos servidores do GitHub (que já vêm
+# com o Android SDK pronto) sempre que este código for enviado ao
+# repositório. O .apk resultante fica disponível para download na aba
+# "Actions" > a execução mais recente > "Artifacts", sem precisar de
+# Android Studio nem de nada instalado na sua máquina.
+on:
+  push:
+    paths:
+      - "android-agent/**"
+      - ".github/workflows/build-apk.yml"
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Dar permissão de execução ao gradlew
+        run: chmod +x ./gradlew
+
+      - name: Compilar o APK de debug
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Publicar o APK como artefato para download
+        uses: actions/upload-artifact@v4
+        with:
+          name: meu-celular-agente-debug
+          path: android-agent/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Gestão Corporativa</string>
+    <string name="accessibility_service_description">Permite que a equipe de TI ajude remotamente com toques e digitação durante uma sessão de suporte que você mesmo solicitou. Uma notificação fica visível sempre que a sessão está ativa.</string>
+    <string name="notification_channel_session">Sessão de acesso remoto</string>
+    <string name="notification_session_active_title">Acesso remoto ativo</string>
+    <string name="notification_session_active_text">Sessão solicitada por você · toque para ver detalhes</string>
+</resources>
