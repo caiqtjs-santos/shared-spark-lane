@@ -172,13 +172,42 @@ function TiView({ data }: { data: Workspace }) {
         {pendingToken && (
           <div className="mt-6 rounded-lg border border-primary/40 bg-primary/5 p-4">
             <p className="text-sm text-foreground">
-              Um único aceite conclui tudo. Confirme o consentimento no aparelho.
+              Envie este link para o profissional abrir <strong>no próprio celular</strong> que
+              ele quer poder acessar remotamente. Um único aceite conclui tudo.
             </p>
-            <p className="mt-2 break-all font-mono text-xs text-muted-foreground">
-              Token: {pendingToken.token}
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                readOnly
+                value={
+                  typeof window !== "undefined"
+                    ? `${window.location.origin}/instalar/${pendingToken.token}`
+                    : ""
+                }
+                onFocus={(e) => e.currentTarget.select()}
+                className="w-full truncate rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  navigator.clipboard?.writeText(
+                    `${window.location.origin}/instalar/${pendingToken.token}`,
+                  );
+                  toast.success("Link copiado.");
+                }}
+              >
+                Copiar
+              </Button>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              O instalador do app Android ainda está em desenvolvimento. Enquanto isso, use o
+              botão abaixo para concluir a ativação manualmente (útil para testes sem um aparelho
+              real).
             </p>
             <Button
               className="mt-3 w-full"
+              variant="outline"
               onClick={() =>
                 accept.mutate({
                   data: { deviceId: pendingToken.id, enrollmentToken: pendingToken.token },
@@ -186,7 +215,7 @@ function TiView({ data }: { data: Workspace }) {
               }
               disabled={accept.isPending}
             >
-              {accept.isPending ? "Ativando..." : "Aceitar termos e concluir"}
+              {accept.isPending ? "Ativando..." : "Concluir ativação manualmente (teste)"}
             </Button>
           </div>
         )}
@@ -237,11 +266,17 @@ function ProfissionalView({ data }: { data: Workspace }) {
   const qc = useQueryClient();
   const invalidate = () => qc.invalidateQueries({ queryKey: ["workspace"] });
 
-  const myDevices = data.devices.filter((d) => d.enrollment_status === "ativo");
-  const primary = myDevices[0];
+  // RLS já restringe "devices" ao próprio profissional (ou a tudo, se for TI
+  // vendo via TiView) — aqui pegamos o aparelho independente do status, para
+  // conseguir mostrar o link de instalação enquanto ele ainda está "pendente".
+  const primary = data.devices[0];
   const activeSession = data.sessions.find(
     (s) => s.status === "ativa" && s.device_id === primary?.id,
   );
+  const installUrl =
+    primary?.enrollment_token && typeof window !== "undefined"
+      ? `${window.location.origin}/instalar/${primary.enrollment_token}`
+      : "";
 
   const [reason, setReason] = useState(
     "Esqueci o celular em casa e preciso liberar um pagamento.",
@@ -269,9 +304,68 @@ function ProfissionalView({ data }: { data: Workspace }) {
     return (
       <div className="rounded-2xl border border-border bg-card p-8 text-center">
         <p className="text-muted-foreground">
-          Nenhum aparelho ativo vinculado à sua conta. Peça ao TI para cadastrar um usando seu
+          Nenhum aparelho vinculado à sua conta ainda. Peça ao TI para cadastrar um usando seu
           código {data.profile?.login_code}.
         </p>
+      </div>
+    );
+  }
+
+  if (primary.enrollment_status === "revogado") {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-8 text-center">
+        <p className="text-muted-foreground">
+          A gestão do aparelho <strong>{primary.name}</strong> foi revogada pelo TI. Peça um novo
+          cadastro se ainda precisar de acesso remoto.
+        </p>
+      </div>
+    );
+  }
+
+  if (primary.enrollment_status === "pendente") {
+    return (
+      <div className="grid gap-6 md:grid-cols-[360px_1fr]">
+        <section className="rounded-2xl border border-border bg-card p-6">
+          <h2 className="font-display text-base">{primary.name}</h2>
+          <p className="text-sm text-muted-foreground">{primary.model} · aguardando ativação</p>
+
+          <div className="mt-6 rounded-lg border border-primary/40 bg-primary/5 p-4">
+            <p className="text-sm text-foreground">
+              Para poder acessar este celular remotamente, abra o link abaixo{" "}
+              <strong>no navegador do próprio aparelho</strong> — não neste computador — e siga o
+              passo a passo.
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                readOnly
+                value={installUrl}
+                onFocus={(e) => e.currentTarget.select()}
+                className="w-full truncate rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  navigator.clipboard?.writeText(installUrl);
+                  toast.success("Link copiado.");
+                }}
+              >
+                Copiar
+              </Button>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              O app de gestão que esse link instala ainda está em desenvolvimento — a ativação
+              final, por enquanto, é concluída pelo TI. O link e a página já funcionam de verdade;
+              falta só o instalador do celular.
+            </p>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-6">
+          <h2 className="font-display text-base">Histórico de acessos</h2>
+          <AuditList items={data.audit.filter((a) => a.device_id === primary.id)} />
+        </section>
       </div>
     );
   }
