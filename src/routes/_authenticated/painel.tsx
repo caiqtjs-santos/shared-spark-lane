@@ -362,8 +362,8 @@ function PhoneMirror({
     <div className="mt-6 overflow-hidden rounded-[28px] border border-border bg-foreground/[0.03]">
       {/* Aviso de consentimento — visível sempre que a sessão está ativa, nunca opcional. */}
       {activeSession && (
-        <div className="flex items-center gap-2 bg-emerald-500/10 px-4 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+        <div className="flex items-center gap-2 bg-primary/10 px-4 py-2 text-xs font-medium text-primary">
+          <span className="h-2 w-2 rounded-full bg-primary" />
           Você está acessando o seu próprio celular
         </div>
       )}
@@ -414,18 +414,15 @@ function PhoneMirror({
               <Label>Modo</Label>
               <div className="grid grid-cols-2 gap-2">
                 {(["visualizacao", "controle"] as const).map((m) => (
-                  <button
+                  <Button
                     key={m}
                     type="button"
+                    variant={mode === m ? "default" : "outline"}
                     onClick={() => setMode(m)}
-                    className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
-                      mode === m
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border text-muted-foreground hover:border-primary/40"
-                    }`}
+                    className="w-full"
                   >
                     {m === "visualizacao" ? "Ver tela" : "Controlar"}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
