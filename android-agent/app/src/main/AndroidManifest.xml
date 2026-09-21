@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Rede: comunicacao com o backend e sinalizacao WebRTC -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Captura de tela (MediaProjection) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+
+    <!-- Bateria/status exibidos no painel -->
+    <uses-permission android:name="android.permission.BATTERY_STATS" tools:ignore="ProtectedPermissions" />
+
+    <!-- Push (FCM) -->
+    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
+
+    <application
+        android:label="Gestão Corporativa"
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false">
+
+        <!--
+          Activity única, mostrada só durante o enrollment (aceite do TI) e,
+          depois de ativo, para o profissional ver o status do próprio
+          aparelho. Nunca é usada para "esconder" nada: é justamente a UI
+          visível do app de gestão descrita nas telas do painel.
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          Receiver de Device Owner. É o que dá ao app as permissões
+          elevadas de gestão (bloqueio, políticas, reset de senha via
+          token) - só funciona se o app for provisionado como Device Owner
+          no primeiro boot do aparelho (QR code / NFC / ADB), nunca em um
+          aparelho já em uso com dono definido.
+        -->
+        <receiver
+            android:name=".DeviceOwnerReceiver"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="true">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin_receiver" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+          Servico de captura/streaming de tela. Roda em foreground com
+          notificacao PERSISTENTE sempre que uma sessao esta ativa - essa
+          notificacao nao e opcional (exigencia do Android para este tipo
+          de servico, e tambem o mecanismo de transparencia do produto).
+        -->
+        <service
+            android:name=".ScreenCaptureService"
+            android:foregroundServiceType="mediaProjection"
+            android:exported="false" />
+
+        <!--
+          Accessibility Service usado para injetar toques/digitacao quando
+          o modo de sessao e "controle". So fica ativo quando o usuario
+          concede a permissao de Acessibilidade explicitamente - o Android
+          mostra uma tela de aviso clara antes de permitir isso.
+        -->
+        <service
+            android:name=".RemoteAccessibilityService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <service
+            android:name=".FcmListenerService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+    </application>
+</manifest>

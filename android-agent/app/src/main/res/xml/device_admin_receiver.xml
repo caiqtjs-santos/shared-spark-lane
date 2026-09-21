@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Politicas que o app pode aplicar como Device Owner. Deliberadamente
+  minimo: so o necessario para reset de senha via token e bloqueio de tela
+  remoto, nada de wipe de dados ou politicas mais invasivas que nao foram
+  desenhadas nas telas do produto.
+-->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <limit-password />
+        <reset-password />
+        <force-lock />
+        <watch-login />
+    </uses-policies>
+</device-admin>
