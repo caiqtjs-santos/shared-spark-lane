@@ -277,7 +277,7 @@ function ProfissionalView({ data }: { data: Workspace }) {
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="grid gap-6 md:grid-cols-[360px_1fr]">
       <section className="rounded-2xl border border-border bg-card p-6">
         <h2 className="font-display text-base">{primary.name}</h2>
         <p className="text-sm text-muted-foreground">
@@ -291,30 +291,121 @@ function ProfissionalView({ data }: { data: Workspace }) {
             : "o app ainda não conectou"}
         </p>
 
+        <PhoneMirror
+          deviceName={primary.name}
+          activeSession={activeSession}
+          reason={reason}
+          setReason={setReason}
+          mode={mode}
+          setMode={setMode}
+          onUnlock={() => start.mutate({ data: { deviceId: primary.id, reason, mode } })}
+          onEndSession={() =>
+            activeSession && stop.mutate({ data: { sessionId: activeSession.id } })
+          }
+          starting={start.isPending}
+          stopping={stop.isPending}
+        />
+      </section>
+
+      <section className="rounded-2xl border border-border bg-card p-6">
+        <h2 className="font-display text-base">Histórico de acessos</h2>
+        <AuditList items={data.audit.filter((a) => a.device_id === primary.id)} />
+      </section>
+    </div>
+  );
+}
+
+/**
+ * Espelho do celular do profissional: reproduz o design que combinamos —
+ * banner de consentimento sempre visível durante a sessão, aviso de
+ * "aparelho gerenciado pela empresa" e o gesto de arrastar para
+ * desbloquear em vez de um botão comum. Sem sessão ativa, mostra a tela
+ * de bloqueio; a sessão real só começa quando o arraste chega ao fim.
+ */
+function PhoneMirror({
+  deviceName,
+  activeSession,
+  reason,
+  setReason,
+  mode,
+  setMode,
+  onUnlock,
+  onEndSession,
+  starting,
+  stopping,
+}: {
+  deviceName: string;
+  activeSession: Workspace["sessions"][number] | undefined;
+  reason: string;
+  setReason: (v: string) => void;
+  mode: "visualizacao" | "controle";
+  setMode: (v: "visualizacao" | "controle") => void;
+  onUnlock: () => void;
+  onEndSession: () => void;
+  starting: boolean;
+  stopping: boolean;
+}) {
+  const [slide, setSlide] = useState(0);
+  const [showForm, setShowForm] = useState(false);
+
+  function handleSlideChange(value: number) {
+    setSlide(value);
+    if (value >= 96 && !starting) {
+      onUnlock();
+      // A tela real vira "sessão ativa" assim que a mutação confirmar;
+      // isso só reseta a alça visual do gesto.
+      setTimeout(() => setSlide(0), 300);
+    }
+  }
+
+  return (
+    <div className="mt-6 overflow-hidden rounded-[28px] border border-border bg-foreground/[0.03]">
+      {/* Aviso de consentimento — visível sempre que a sessão está ativa, nunca opcional. */}
+      {activeSession && (
+        <div className="flex items-center gap-2 bg-emerald-500/10 px-4 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+          Você está acessando o seu próprio celular
+        </div>
+      )}
+
+      <div className="border-b border-border/60 bg-card/60 px-4 py-2 text-center text-[11px] text-muted-foreground">
+        Aparelho gerenciado pela empresa
+      </div>
+
+      <div className="flex min-h-[380px] flex-col justify-between p-5">
         {activeSession ? (
-          <div className="mt-6 rounded-lg border border-primary/40 bg-primary/5 p-4">
-            <p className="font-medium text-foreground">Sessão ativa</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Iniciada em {new Date(activeSession.started_at).toLocaleString("pt-BR")} · modo{" "}
-              {activeSession.mode}
-            </p>
+          <>
+            <div className="flex-1">
+              <div className="grid grid-cols-3 gap-3 pt-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex aspect-square items-center justify-center rounded-2xl bg-foreground/5 text-[10px] text-muted-foreground"
+                  >
+                    app
+                  </div>
+                ))}
+              </div>
+              <p className="mt-4 text-center text-[11px] text-muted-foreground">
+                {deviceName} · modo {activeSession.mode === "controle" ? "controle" : "visualização"} ·
+                iniciada às{" "}
+                {new Date(activeSession.started_at).toLocaleTimeString("pt-BR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+            </div>
             <Button
-              className="mt-3 w-full"
               variant="outline"
-              onClick={() => stop.mutate({ data: { sessionId: activeSession.id } })}
-              disabled={stop.isPending}
+              className="w-full"
+              onClick={onEndSession}
+              disabled={stopping}
             >
-              Encerrar sessão
+              {stopping ? "Encerrando..." : "Encerrar sessão"}
             </Button>
-          </div>
-        ) : (
-          <form
-            className="mt-6 space-y-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              start.mutate({ data: { deviceId: primary.id, reason, mode } });
-            }}
-          >
+          </>
+        ) : showForm ? (
+          <div className="flex-1 space-y-3">
             <div className="space-y-1">
               <Label>Motivo do acesso</Label>
               <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} />
@@ -338,17 +429,54 @@ function ProfissionalView({ data }: { data: Workspace }) {
                 ))}
               </div>
             </div>
-            <Button type="submit" className="w-full" disabled={start.isPending}>
-              {start.isPending ? "Iniciando..." : "Iniciar acesso ao meu celular"}
-            </Button>
-          </form>
-        )}
-      </section>
 
-      <section className="rounded-2xl border border-border bg-card p-6">
-        <h2 className="font-display text-base">Histórico de acessos</h2>
-        <AuditList items={data.audit.filter((a) => a.device_id === primary.id)} />
-      </section>
+            <SlideToUnlock value={slide} onChange={handleSlideChange} disabled={starting} />
+          </div>
+        ) : (
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-foreground/5 text-2xl">
+              🔒
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Aparelho bloqueado. Informe o motivo do acesso para desbloquear remotamente.
+            </p>
+            <Button onClick={() => setShowForm(true)}>Iniciar acesso ao meu celular</Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Gesto de arrastar para desbloquear — substitui o botão comum de início de sessão. */
+function SlideToUnlock({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="relative mt-2 h-12 w-full overflow-hidden rounded-full border border-border bg-foreground/5">
+      <div
+        className="pointer-events-none absolute inset-y-0 left-0 rounded-full bg-primary/20 transition-[width]"
+        style={{ width: `${value}%` }}
+      />
+      <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-medium text-muted-foreground">
+        {disabled ? "Desbloqueando..." : "Arraste para desbloquear e iniciar o acesso"}
+      </span>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        aria-label="Arraste para desbloquear e iniciar o acesso ao celular"
+      />
     </div>
   );
 }
