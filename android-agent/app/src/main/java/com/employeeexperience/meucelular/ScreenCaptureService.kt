@@ -28,7 +28,9 @@ class ScreenCaptureService : Service() {
 
     companion object {
         const val CHANNEL_ID = "sessao_acesso_remoto"
-        const val NOTIFICATION_ID = 1001
+        // 1002: 1000/1001 já são usados pelo SessionWatcherService (idle/ativa),
+        // que continua rodando quando este serviço de captura sobe junto.
+        const val NOTIFICATION_ID = 1002
         const val EXTRA_RESULT_CODE = "resultCode"
         const val EXTRA_RESULT_DATA = "resultData"
     }
