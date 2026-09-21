@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -7,6 +8,14 @@ import { Button } from "@/components/ui/button";
  * NO PRÓPRIO CELULAR que vai ser acessado remotamente — é isso que a
  * torna diferente de um link clicado em qualquer lugar: o app de gestão
  * só existe (ou vai existir) no aparelho onde essa página for aberta.
+ *
+ * Fluxo de 2 toques, sem digitar nada: no 1º toque (app ainda não
+ * instalado), o Android não tem quem abra o link "meucelular://ativar" e
+ * cai no fallback, que é ESTA página — a pessoa baixa e instala o .apk
+ * normalmente. Depois de instalado, reabrir o MESMO link (ex: pela
+ * notificação de download, ou tocando o link de novo) faz o Android abrir
+ * direto dentro do app já com o token, sem precisar copiar/colar nada -
+ * ver o intent-filter de "meucelular://ativar" no AndroidManifest.xml.
  */
 export const Route = createFileRoute("/instalar/$token")({
   head: () => ({
@@ -27,6 +36,9 @@ interface DeviceInfo {
   status: "pendente" | "ativo" | "revogado";
 }
 
+const ANDROID_PACKAGE = "com.employeeexperience.meucelular";
+const APK_URL = "/app/meu-celular-agente.apk";
+
 function InstalarPage() {
   const { token } = Route.useParams();
 
@@ -40,6 +52,22 @@ function InstalarPage() {
     },
     retry: false,
   });
+
+  // Tenta abrir o app já instalado, passando o token direto. Se não houver
+  // app instalado para tratar o link, o navegador ignora silenciosamente e
+  // a pessoa só vê a página normal abaixo - nada quebra nesse caso.
+  useEffect(() => {
+    if (data?.status !== "pendente") return;
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    if (!isAndroid) return;
+
+    const fallback = encodeURIComponent(window.location.href);
+    const intentUrl =
+      `intent://ativar?token=${encodeURIComponent(token)}` +
+      `#Intent;scheme=meucelular;package=${ANDROID_PACKAGE};S.browser_fallback_url=${fallback};end`;
+
+    window.location.href = intentUrl;
+  }, [data?.status, token]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
@@ -86,19 +114,17 @@ function InstalarPage() {
               </div>
 
               <ol className="mt-5 space-y-2 text-sm text-muted-foreground">
-                <li>1. Toque em "Baixar e ativar" abaixo.</li>
-                <li>2. Um único aceite instala o app e liga o aviso permanente na tela.</li>
-                <li>3. A partir daí, o acesso remoto a este aparelho fica disponível no painel.</li>
+                <li>1. Toque em "Baixar app de gestão" abaixo.</li>
+                <li>2. Instale o arquivo baixado (o Android vai pedir para autorizar instalação de fora da Play Store — é esperado, e só precisa autorizar uma vez).</li>
+                <li>3. Depois de instalado, toque neste mesmo link de novo (ex: na notificação de download): o app abre sozinho já ativado, sem precisar digitar nada.</li>
               </ol>
 
-              <Button className="mt-6 w-full" disabled title="Instalador ainda não disponível">
-                Baixar e ativar
-              </Button>
+              <a href={APK_URL} download>
+                <Button className="mt-6 w-full">Baixar app de gestão</Button>
+              </a>
               <p className="mt-3 text-center text-xs text-muted-foreground">
-                O aplicativo Android que instala e mantém o aviso de "aparelho gerenciado" ainda
-                está em desenvolvimento — este link e esta página já são reais, mas o arquivo
-                instalável ainda não existe. Enquanto isso, o TI pode concluir a ativação
-                manualmente pelo painel, para testes.
+                O Android é quem exige o passo de instalação manual (não dá para pular por
+                design do sistema) — mas depois de instalado uma vez, ativar fica em 1 toque.
               </p>
             </>
           )}

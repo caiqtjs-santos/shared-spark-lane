@@ -36,10 +36,27 @@
         -->
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+              Link de ativação em 2 toques: a página /instalar/<token> do
+              painel tenta abrir "meucelular://ativar?token=..." assim que
+              carrega. Antes de instalar, isso falha silenciosamente e a
+              pessoa só vê a página normal com o botão de baixar. Depois de
+              instalado, o MESMO link (reaberto, ou tocado de novo a partir
+              do histórico de downloads) já entra direto aqui com o token,
+              sem precisar copiar/colar nada.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="meucelular" android:host="ativar" />
             </intent-filter>
         </activity>
 

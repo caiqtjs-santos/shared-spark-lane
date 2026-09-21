@@ -70,6 +70,31 @@ class MainActivity : AppCompatActivity() {
         if (deviceStore.isEnrolled) {
             startSessionWatcher()
         }
+
+        handleActivationDeepLink(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleActivationDeepLink(intent)
+    }
+
+    /**
+     * Trata "meucelular://ativar?token=..." (ver AndroidManifest.xml). É o
+     * segundo toque do fluxo de 2 toques: a página /instalar/<token> tenta
+     * abrir esse link assim que carrega; se o app já estiver instalado,
+     * cai aqui direto com o token, sem a pessoa precisar copiar/colar nada.
+     * Se já estiver ativado, ignora silenciosamente (nada a fazer de novo).
+     */
+    private fun handleActivationDeepLink(intent: Intent?) {
+        val uri = intent?.data ?: return
+        if (uri.scheme != "meucelular" || uri.host != "ativar") return
+        val token = uri.getQueryParameter("token") ?: return
+        if (deviceStore.isEnrolled) return
+
+        inputToken.setText(token)
+        onActivateClicked()
     }
 
     private fun renderEnrollmentState() {
