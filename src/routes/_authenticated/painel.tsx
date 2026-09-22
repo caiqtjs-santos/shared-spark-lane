@@ -144,6 +144,10 @@ function TiView({ data }: { data: Workspace }) {
           className="mt-4 space-y-3"
           onSubmit={(e) => {
             e.preventDefault();
+            if (ownerLoginCode.length !== 6) {
+              toast.error("O código do profissional precisa ter 6 dígitos.");
+              return;
+            }
             create.mutate({ data: { name, model, ownerLoginCode } });
           }}
         >
@@ -162,9 +166,18 @@ function TiView({ data }: { data: Workspace }) {
               onChange={(e) => setOwnerLoginCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
               placeholder="000000"
               className="font-mono tracking-widest"
+              inputMode="numeric"
+              maxLength={6}
             />
+            {ownerLoginCode.length > 0 && ownerLoginCode.length < 6 && (
+              <p className="text-xs text-muted-foreground">Faltam {6 - ownerLoginCode.length} dígitos.</p>
+            )}
           </div>
-          <Button type="submit" disabled={create.isPending} className="w-full">
+          <Button
+            type="submit"
+            disabled={create.isPending || ownerLoginCode.length !== 6}
+            className="w-full"
+          >
             {create.isPending ? "Cadastrando..." : "Baixar e ativar app de gestão"}
           </Button>
         </form>

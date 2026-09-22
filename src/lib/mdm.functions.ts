@@ -2,7 +2,20 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-const sixDigits = z.string().regex(/^\d{6}$/);
+const sixDigits = z.string().regex(/^\d{6}$/, "O código precisa ter exatamente 6 dígitos numéricos.");
+
+/**
+ * Valida `input` contra `schema` e devolve uma mensagem de erro legível (em vez do
+ * ZodError cru, cujo `.message` é um JSON de issues como `{"code":"invalid_string",...}`).
+ */
+function parseInput<T extends z.ZodTypeAny>(schema: T, input: unknown): z.infer<T> {
+  const result = schema.safeParse(input);
+  if (!result.success) {
+    const issue = result.error.issues[0];
+    throw new Error(issue?.message || "Dados inválidos.");
+  }
+  return result.data;
+}
 
 async function admin() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -34,13 +47,14 @@ async function logAudit(
 export const finishSignup = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z
-      .object({
+    parseInput(
+      z.object({
         loginCode: sixDigits,
-        name: z.string().min(2).max(80),
+        name: z.string().min(2, "O nome precisa ter pelo menos 2 letras.").max(80),
         role: z.enum(["profissional", "ti"]),
-      })
-      .parse(input),
+      }),
+      input,
+    ),
   )
   .handler(async ({ data, context }) => {
     const db = await admin();
@@ -113,13 +127,14 @@ export const getWorkspace = createServerFn({ method: "GET" })
 export const createDevice = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z
-      .object({
-        name: z.string().min(1).max(80),
-        model: z.string().min(1).max(80),
+    parseInput(
+      z.object({
+        name: z.string().min(1, "Informe um nome para o aparelho.").max(80),
+        model: z.string().min(1, "Informe o modelo do aparelho.").max(80),
         ownerLoginCode: sixDigits,
-      })
-      .parse(input),
+      }),
+      input,
+    ),
   )
   .handler(async ({ data, context }) => {
     if (!(await isTi(context))) throw new Error("Apenas o time de TI pode cadastrar aparelhos.");
@@ -160,7 +175,13 @@ export const createDevice = createServerFn({ method: "POST" })
 export const acceptEnrollment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ deviceId: z.string().uuid(), enrollmentToken: z.string().min(8) }).parse(input),
+    parseInput(
+      z.object({
+        deviceId: z.string().uuid("Identificador de aparelho inválido."),
+        enrollmentToken: z.string().min(8, "Token de ativação inválido."),
+      }),
+      input,
+    ),
   )
   .handler(async ({ data, context }) => {
     if (!(await isTi(context))) throw new Error("Apenas o time de TI pode concluir a ativação.");
@@ -197,7 +218,9 @@ export const acceptEnrollment = createServerFn({ method: "POST" })
 /** TI revoga a gestão do aparelho e encerra qualquer sessão aberta. */
 export const revokeDevice = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ deviceId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) =>
+    parseInput(z.object({ deviceId: z.string().uuid("Identificador de aparelho inválido.") }), input),
+  )
   .handler(async ({ data, context }) => {
     if (!(await isTi(context))) throw new Error("Apenas o time de TI pode revogar aparelhos.");
     const db = await admin();
@@ -227,13 +250,14 @@ export const revokeDevice = createServerFn({ method: "POST" })
 export const startSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z
-      .object({
-        deviceId: z.string().uuid(),
-        reason: z.string().min(5).max(500),
+    parseInput(
+      z.object({
+        deviceId: z.string().uuid("Identificador de aparelho inválido."),
+        reason: z.string().min(5, "Descreva o motivo do acesso com pelo menos 5 letras.").max(500),
         mode: z.enum(["visualizacao", "controle"]),
-      })
-      .parse(input),
+      }),
+      input,
+    ),
   )
   .handler(async ({ data, context }) => {
     const db = await admin();
@@ -285,7 +309,9 @@ export const startSession = createServerFn({ method: "POST" })
 /** Encerra a sessão de acesso. */
 export const endSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ sessionId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) =>
+    parseInput(z.object({ sessionId: z.string().uuid("Identificador de sessão inválido.") }), input),
+  )
   .handler(async ({ data, context }) => {
     const db = await admin();
     const ti = await isTi(context);
