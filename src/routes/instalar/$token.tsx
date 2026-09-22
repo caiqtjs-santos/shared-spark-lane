@@ -126,6 +126,18 @@ function InstalarPage() {
                 O Android é quem exige o passo de instalação manual (não dá para pular por
                 design do sistema) — mas depois de instalado uma vez, ativar fica em 1 toque.
               </p>
+
+              <div className="mt-5 rounded-lg border border-border bg-muted/40 px-3 py-3 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground">
+                  Se o arquivo baixar e desaparecer sozinho
+                </p>
+                <p className="mt-1">
+                  É o Play Protect apagando um app que ele não conhece. No aplicativo Play
+                  Store, toque na sua foto → Play Protect → engrenagem, desligue "Melhorar
+                  detecção de apps nocivos" e baixe de novo. É um app da própria empresa,
+                  autorizado pelo TI.
+                </p>
+              </div>
             </>
           )}
         </div>
