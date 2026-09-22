@@ -5,6 +5,13 @@ name: Build APK
 # repositório, e publica o .apk resultante dentro do próprio site
 # (public/app/meu-celular-agente.apk) para virar um link de download
 # real e permanente - sem precisar de login no GitHub para baixar.
+#
+# O APK agora é de RELEASE e assinado com uma chave estável: builds de debug
+# são apagados silenciosamente pelo Play Protect depois do download ("baixa e
+# some"). A chave é criada uma única vez, na primeira execução, e commitada no
+# repositório (keystore/meu-celular.jks + keystore.properties) para que todos
+# os builds seguintes assinem o app com a MESMA identidade - é o que permite
+# atualizar o app no aparelho sem desinstalar.
 on:
   push:
     paths:
@@ -27,34 +34,56 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Criar a chave de assinatura (só na primeira vez)
+        working-directory: android-agent
+        run: |
+          if [ -f keystore.properties ]; then
+            echo "Chave de assinatura já existe - reutilizando."
+            exit 0
+          fi
+          mkdir -p keystore
+          PASS="$(openssl rand -hex 24)"
+          keytool -genkeypair -v \
+            -keystore keystore/meu-celular.jks \
+            -alias meucelular \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass "$PASS" -keypass "$PASS" \
+            -dname "CN=Meu Celular, OU=TI, O=Employee Experience, C=BR"
+          {
+            echo "storeFile=keystore/meu-celular.jks"
+            echo "storePassword=$PASS"
+            echo "keyAlias=meucelular"
+            echo "keyPassword=$PASS"
+          } > keystore.properties
+
       - name: Dar permissão de execução ao gradlew
         working-directory: android-agent
         run: chmod +x ./gradlew
 
-      - name: Compilar o APK de debug
+      - name: Compilar o APK de release assinado
         working-directory: android-agent
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleRelease --stacktrace
 
       - name: Publicar o APK como artefato do Actions (histórico de builds)
         uses: actions/upload-artifact@v4
         with:
-          name: meu-celular-agente-debug
-          path: android-agent/app/build/outputs/apk/debug/app-debug.apk
+          name: meu-celular-agente-release
+          path: android-agent/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
       - name: Copiar o APK para dentro do site (public/app)
         run: |
           mkdir -p public/app
-          cp android-agent/app/build/outputs/apk/debug/app-debug.apk public/app/meu-celular-agente.apk
+          cp android-agent/app/build/outputs/apk/release/app-release.apk public/app/meu-celular-agente.apk
 
-      - name: Publicar o APK de volta no repositório
+      - name: Publicar o APK e a chave de volta no repositório
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add public/app/meu-celular-agente.apk
+          git add public/app/meu-celular-agente.apk android-agent/keystore.properties android-agent/keystore/meu-celular.jks
           if git diff --cached --quiet; then
-            echo "APK sem mudanças - nada para publicar."
+            echo "Nada novo para publicar."
           else
-            git commit -m "chore: publicar novo build do app Android [skip ci]"
+            git commit -m "chore: publicar novo build assinado do app Android [skip ci]"
             git push
           fi
