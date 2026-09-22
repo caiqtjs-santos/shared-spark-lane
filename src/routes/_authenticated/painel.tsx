@@ -10,6 +10,11 @@ import {
   startSession,
   endSession,
 } from "@/lib/mdm.functions";
+import {
+  getEnterpriseStatus,
+  startEnterpriseSignup,
+  createDeviceQrProvisioning,
+} from "@/lib/enterprise.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -108,6 +113,23 @@ function TiView({ data }: { data: Workspace }) {
   const [model, setModel] = useState("Moto G54");
   const [ownerLoginCode, setOwnerLoginCode] = useState("");
   const [pendingToken, setPendingToken] = useState<{ id: string; token: string } | null>(null);
+  const [qrByDevice, setQrByDevice] = useState<Record<string, string>>({});
+
+  const enterpriseStatus = useQuery({
+    queryKey: ["enterprise-status"],
+    queryFn: useServerFn(getEnterpriseStatus),
+  });
+  const startEnterprise = useMutation({
+    mutationFn: useServerFn(startEnterpriseSignup),
+    onSuccess: (res: { url: string }) => {
+      window.location.href = res.url;
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const generateQr = useMutation({
+    mutationFn: useServerFn(createDeviceQrProvisioning),
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const create = useMutation({
     mutationFn: useServerFn(createDevice),
@@ -138,6 +160,33 @@ function TiView({ data }: { data: Workspace }) {
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
+      <section className="rounded-2xl border border-border bg-card p-6 md:col-span-2">
+        <h2 className="font-display text-base">Android Enterprise (Managed Google Play)</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          O Google Play Protect bloqueia a instalação do app fora de um canal validado. Este modo
+          resolve isso: o aparelho é provisionado por QR code em vez de baixar o .apk diretamente.
+        </p>
+        {enterpriseStatus.isLoading ? (
+          <p className="mt-3 text-sm text-muted-foreground">Verificando status...</p>
+        ) : enterpriseStatus.data?.configured ? (
+          <p className="mt-3 text-sm text-foreground">
+            Configurado — <span className="font-mono text-xs">{enterpriseStatus.data.enterpriseName}</span>
+          </p>
+        ) : (
+          <Button
+            className="mt-3"
+            onClick={() =>
+              startEnterprise.mutate({
+                data: { callbackBaseUrl: window.location.origin },
+              })
+            }
+            disabled={startEnterprise.isPending}
+          >
+            {startEnterprise.isPending ? "Abrindo cadastro..." : "Configurar Android Enterprise"}
+          </Button>
+        )}
+      </section>
+
       <section className="rounded-2xl border border-border bg-card p-6">
         <h2 className="font-display text-base">Cadastrar aparelho</h2>
         <form
@@ -241,26 +290,58 @@ function TiView({ data }: { data: Workspace }) {
             <li className="text-sm text-muted-foreground">Nenhum aparelho cadastrado ainda.</li>
           )}
           {data.devices.map((d) => (
-            <li
-              key={d.id}
-              className="flex items-start justify-between gap-3 rounded-lg border border-border p-3"
-            >
-              <div>
-                <p className="font-medium">{d.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {d.model} · situação: {d.enrollment_status}
-                </p>
-                <p className="text-xs text-muted-foreground">id {d.id.slice(0, 8)}</p>
+            <li key={d.id} className="rounded-lg border border-border p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium">{d.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {d.model} · situação: {d.enrollment_status}
+                  </p>
+                  <p className="text-xs text-muted-foreground">id {d.id.slice(0, 8)}</p>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  {d.enrollment_status !== "revogado" && enterpriseStatus.data?.configured && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        generateQr.mutate(
+                          { data: { deviceId: d.id } },
+                          {
+                            onSuccess: (res: { qrCodePngBase64: string }) =>
+                              setQrByDevice((prev) => ({ ...prev, [d.id]: res.qrCodePngBase64 })),
+                          },
+                        )
+                      }
+                      disabled={generateQr.isPending}
+                    >
+                      Gerar QR de provisionamento
+                    </Button>
+                  )}
+                  {d.enrollment_status !== "revogado" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => revoke.mutate({ data: { deviceId: d.id } })}
+                      disabled={revoke.isPending}
+                    >
+                      Revogar
+                    </Button>
+                  )}
+                </div>
               </div>
-              {d.enrollment_status !== "revogado" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => revoke.mutate({ data: { deviceId: d.id } })}
-                  disabled={revoke.isPending}
-                >
-                  Revogar
-                </Button>
+              {qrByDevice[d.id] && (
+                <div className="mt-3 flex flex-col items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 p-4">
+                  <img
+                    src={`data:image/png;base64,${qrByDevice[d.id]}`}
+                    alt={`QR de provisionamento do aparelho ${d.name}`}
+                    className="h-48 w-48"
+                  />
+                  <p className="text-center text-xs text-muted-foreground">
+                    No aparelho recém-resetado de fábrica, na tela de boas-vindas, toque 6 vezes em
+                    um ponto vazio da tela e escaneie este QR. Válido por 1 hora.
+                  </p>
+                </div>
               )}
             </li>
           ))}
