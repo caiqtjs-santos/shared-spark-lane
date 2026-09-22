@@ -8,7 +8,12 @@
 - [ ] Instalação no celular: CONFIRMADO bloqueio do Play Protect (não é debug-vs-release; assinatura de release não resolve).
       Causa: combo Device Owner + Accessibility + MediaProjection instalado fora da Play Store = padrão que o Google trata como stalkerware. Não dá para contornar com código.
       Caminho definido: Android Enterprise — app privado no Managed Google Play + Android Management API (gratuito; exige conta Google/Cloud da empresa).
-      AGUARDANDO: decisão da empresa sobre abrir a conta corporativa Google.
+      DECISÃO (22/09/2026): seguir agora. Empresa SEM Google Workspace → enterprise no modo Managed Google Play Accounts (Google cria a conta de gestão gratuitamente).
+  - [x] Passo a passo para quem decide (arquivo: android-enterprise-guia.md)
+  - [ ] Empresa criar projeto no Google Cloud com Android Management API + conta de serviço (chave JSON) — depois add_secret
+  - [ ] Integrar Android Management API no backend (signup URL, criação da enterprise, token de enrollment, política do aparelho, QR de provisionamento)
+  - [ ] Publicar o app como app privado no Managed Google Play (AAB assinado)
+  - [ ] Ajustar fluxo de ativação: QR de provisionamento no lugar do download de APK
 - [ ] Testar o fluxo de ativação em 2 toques num Android real
 
 ## A função central (ainda só esqueleto)
