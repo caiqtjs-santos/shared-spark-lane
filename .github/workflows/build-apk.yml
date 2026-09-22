@@ -1,17 +1,17 @@
 name: Build APK
 
-# Compila o app Android de verdade nos servidores do GitHub (que já vêm
-# com o Android SDK pronto) sempre que este código for enviado ao
-# repositório, e publica o .apk resultante dentro do próprio site
-# (public/app/meu-celular-agente.apk) para virar um link de download
-# real e permanente - sem precisar de login no GitHub para baixar.
+# Compila o app Android de verdade nos servidores do GitHub (que já vêm com o
+# Android SDK pronto) e publica o .apk resultante dentro do próprio site
+# (public/app/meu-celular-agente.apk).
 #
-# O APK agora é de RELEASE e assinado com uma chave estável: builds de debug
-# são apagados silenciosamente pelo Play Protect depois do download ("baixa e
-# some"). A chave é criada uma única vez, na primeira execução, e commitada no
-# repositório (keystore/meu-celular.jks + keystore.properties) para que todos
-# os builds seguintes assinem o app com a MESMA identidade - é o que permite
-# atualizar o app no aparelho sem desinstalar.
+# A chave de assinatura NUNCA fica no repositório. Ela vem dos secrets do
+# repositório (Settings > Secrets and variables > Actions):
+#   KEYSTORE_BASE64          - o arquivo .jks codificado em base64
+#   KEYSTORE_STORE_PASSWORD  - senha do keystore
+#   KEYSTORE_KEY_ALIAS       - alias da chave (ex.: meucelular)
+#   KEYSTORE_KEY_PASSWORD    - senha da chave
+# O arquivo decodificado vive só durante a execução, em um diretório temporário
+# que morre junto com o runner.
 on:
   push:
     paths:
@@ -34,27 +34,17 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Criar a chave de assinatura (só na primeira vez)
-        working-directory: android-agent
+      - name: Conferir se a chave de assinatura está configurada
+        if: ${{ secrets.KEYSTORE_BASE64 == '' }}
         run: |
-          if [ -f keystore.properties ]; then
-            echo "Chave de assinatura já existe - reutilizando."
-            exit 0
-          fi
-          mkdir -p keystore
-          PASS="$(openssl rand -hex 24)"
-          keytool -genkeypair -v \
-            -keystore keystore/meu-celular.jks \
-            -alias meucelular \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass "$PASS" -keypass "$PASS" \
-            -dname "CN=Meu Celular, OU=TI, O=Employee Experience, C=BR"
-          {
-            echo "storeFile=keystore/meu-celular.jks"
-            echo "storePassword=$PASS"
-            echo "keyAlias=meucelular"
-            echo "keyPassword=$PASS"
-          } > keystore.properties
+          echo "::error::Falta o secret KEYSTORE_BASE64 (e as senhas) em Settings > Secrets and variables > Actions."
+          exit 1
+
+      - name: Decodificar a chave de assinatura (temporária)
+        run: |
+          mkdir -p "$RUNNER_TEMP/keystore"
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/keystore/release.jks"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/keystore/release.jks" >> "$GITHUB_ENV"
 
       - name: Dar permissão de execução ao gradlew
         working-directory: android-agent
@@ -62,7 +52,15 @@ jobs:
 
       - name: Compilar o APK de release assinado
         working-directory: android-agent
+        env:
+          KEYSTORE_STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
+          KEYSTORE_KEY_ALIAS: ${{ secrets.KEYSTORE_KEY_ALIAS }}
+          KEYSTORE_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
         run: ./gradlew assembleRelease --stacktrace
+
+      - name: Apagar a chave do runner
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keystore"
 
       - name: Publicar o APK como artefato do Actions (histórico de builds)
         uses: actions/upload-artifact@v4
@@ -76,11 +74,11 @@ jobs:
           mkdir -p public/app
           cp android-agent/app/build/outputs/apk/release/app-release.apk public/app/meu-celular-agente.apk
 
-      - name: Publicar o APK e a chave de volta no repositório
+      - name: Publicar o APK de volta no repositório
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add public/app/meu-celular-agente.apk android-agent/keystore.properties android-agent/keystore/meu-celular.jks
+          git add public/app/meu-celular-agente.apk
           if git diff --cached --quiet; then
             echo "Nada novo para publicar."
           else

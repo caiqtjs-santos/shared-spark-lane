@@ -5,16 +5,35 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-// Chave de assinatura de release. O arquivo keystore.properties (e o .jks que
-// ele aponta) é criado uma única vez pelo workflow do GitHub Actions e
-// reutilizado em todos os builds seguintes, para que o Android reconheça
-// sempre o mesmo app (atualizações + menos chance de bloqueio do Play
-// Protect, que apaga silenciosamente APKs de debug).
+// Chave de assinatura de release. NUNCA fica commitada no repositório (ver
+// .gitignore) - o build assinado lê a chave de uma destas duas formas:
+//
+//  1) Variáveis de ambiente (usado no GitHub Actions - ver build-apk.yml):
+//     KEYSTORE_FILE (caminho para o .jks já decodificado no runner),
+//     KEYSTORE_STORE_PASSWORD, KEYSTORE_KEY_ALIAS, KEYSTORE_KEY_PASSWORD.
+//  2) Um keystore.properties LOCAL (gitignored) para quem quiser gerar um
+//     build assinado na própria máquina - mesmo formato de antes:
+//     storeFile / storePassword / keyAlias / keyPassword.
+//
+// Sem nenhuma das duas, o build de release sai sem assinatura própria
+// (útil para compilar e checar erros, mas não é o artefato para instalar/
+// atualizar em produção - ver comentário no workflow sobre o Play Protect).
 val keystorePropsFile = rootProject.file("keystore.properties")
 val keystoreProps = Properties().apply {
     if (keystorePropsFile.exists()) keystorePropsFile.inputStream().use { load(it) }
 }
-val hasReleaseKey = keystoreProps.getProperty("storeFile") != null
+
+val envKeystoreFile = System.getenv("KEYSTORE_FILE")
+val hasEnvReleaseKey = !envKeystoreFile.isNullOrBlank()
+val hasPropsReleaseKey = keystoreProps.getProperty("storeFile") != null
+val hasReleaseKey = hasEnvReleaseKey || hasPropsReleaseKey
+
+fun releaseSigningStoreFile() =
+    if (hasEnvReleaseKey) rootProject.file(envKeystoreFile!!) else rootProject.file(keystoreProps.getProperty("storeFile"))
+
+fun releaseSigningProperty(envName: String, propsKey: String): String =
+    System.getenv(envName) ?: keystoreProps.getProperty(propsKey)
+    ?: error("Faltando $envName (ou $propsKey no keystore.properties local)")
 
 android {
     namespace = "com.employeeexperience.meucelular"
@@ -31,10 +50,10 @@ android {
     signingConfigs {
         if (hasReleaseKey) {
             create("release") {
-                storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
-                storePassword = keystoreProps.getProperty("storePassword")
-                keyAlias = keystoreProps.getProperty("keyAlias")
-                keyPassword = keystoreProps.getProperty("keyPassword")
+                storeFile = releaseSigningStoreFile()
+                storePassword = releaseSigningProperty("KEYSTORE_STORE_PASSWORD", "storePassword")
+                keyAlias = releaseSigningProperty("KEYSTORE_KEY_ALIAS", "keyAlias")
+                keyPassword = releaseSigningProperty("KEYSTORE_KEY_PASSWORD", "keyPassword")
             }
         }
     }
