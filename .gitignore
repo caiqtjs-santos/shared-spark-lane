@@ -30,3 +30,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Chave de assinatura do app Android - NUNCA no repositorio
+android-agent/keystore.properties
+android-agent/keystore/
+*.jks
+*.keystore
