@@ -1,6 +1,13 @@
 # Meu Celular — o que falta
 
+## Decisões registradas
+- Android Enterprise / Managed Google Play vale para aparelhos novos e resets planejados, a partir de agora. Não é retrofit em aparelho já em uso (a plataforma não permite sem reset). Configuração única feita pelo TI na entrega do aparelho.
+- Chave de assinatura do app NUNCA no repositório: vive nos secrets do GitHub (KEYSTORE_BASE64, KEYSTORE_STORE_PASSWORD, KEYSTORE_KEY_ALIAS, KEYSTORE_KEY_PASSWORD).
+
 ## Bloqueando agora
+- [x] Remover a chave de assinatura do repositório e proteger via .gitignore + secrets
+- [ ] Cadastrar os 4 secrets de assinatura no repositório do GitHub (só você pode fazer)
+
 - [x] Aplicar o fix do gradle-wrapper.jar
 - [x] Build do APK passando (jar, gradlew, flag AndroidX resolvidos)
 - [x] APK publicado dentro do site (public/app/meu-celular-agente.apk)
