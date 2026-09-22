@@ -5,8 +5,10 @@
 - [x] Build do APK passando (jar, gradlew, flag AndroidX resolvidos)
 - [x] APK publicado dentro do site (public/app/meu-celular-agente.apk)
 - [ ] Republicar o site para o link de download ficar no ar
-- [ ] Instalação no celular: o download "baixa e some" — provável bloqueio do Play Protect por ser build de debug
-      Saídas: assinar com chave de release, ou distribuir como app interno/privado (Managed Google Play)
+- [ ] Instalação no celular: CONFIRMADO bloqueio do Play Protect (não é debug-vs-release; assinatura de release não resolve).
+      Causa: combo Device Owner + Accessibility + MediaProjection instalado fora da Play Store = padrão que o Google trata como stalkerware. Não dá para contornar com código.
+      Caminho definido: Android Enterprise — app privado no Managed Google Play + Android Management API (gratuito; exige conta Google/Cloud da empresa).
+      AGUARDANDO: decisão da empresa sobre abrir a conta corporativa Google.
 - [ ] Testar o fluxo de ativação em 2 toques num Android real
 
 ## A função central (ainda só esqueleto)
