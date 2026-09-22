@@ -19,9 +19,11 @@
   - [x] Passo a passo para quem decide (arquivo: android-enterprise-guia.md)
   - [ ] Empresa criar projeto no Google Cloud com Android Management API + conta de serviço (chave JSON) — colar em ANDROID_MANAGEMENT_SA_JSON (formulário seguro)
   - [x] Project ID do Google Cloud guardado (GOOGLE_CLOUD_PROJECT_ID = long-carving-509414-d3)
-  - [ ] Integrar Android Management API no backend (signup URL, criação da enterprise, token de enrollment, política do aparelho, QR de provisionamento)
+  - [x] Integrar Android Management API no backend (signup URL, criação da enterprise, política do aparelho, token de enrollment, QR de provisionamento) + tabela enterprise_config e campos de QR em devices
+  - [x] Painel: cartão "Android Enterprise" + botão "Gerar QR de provisionamento" por aparelho
   - [ ] Publicar o app como app privado no Managed Google Play (AAB assinado)
-  - [ ] Ajustar fluxo de ativação: QR de provisionamento no lugar do download de APK
+  - [ ] Detectar automaticamente quando o aparelho conclui o provisionamento (Pub/Sub ou consulta periódica) — hoje o status ainda depende do aceite manual
+  - [ ] Ajustar o app Android para rodar como app gerenciado pela política
 - [ ] Testar o fluxo de ativação em 2 toques num Android real
 
 ## A função central (ainda só esqueleto)

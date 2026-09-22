@@ -102,6 +102,11 @@ export type Database = {
       }
       devices: {
         Row: {
+          android_enrollment_expires_at: string | null
+          android_enrollment_qr_png: string | null
+          android_enrollment_token_name: string | null
+          android_enrollment_token_value: string | null
+          android_management_device_name: string | null
           battery_level: number | null
           created_at: string
           device_secret: string | null
@@ -117,6 +122,11 @@ export type Database = {
           push_token: string | null
         }
         Insert: {
+          android_enrollment_expires_at?: string | null
+          android_enrollment_qr_png?: string | null
+          android_enrollment_token_name?: string | null
+          android_enrollment_token_value?: string | null
+          android_management_device_name?: string | null
           battery_level?: number | null
           created_at?: string
           device_secret?: string | null
@@ -132,6 +142,11 @@ export type Database = {
           push_token?: string | null
         }
         Update: {
+          android_enrollment_expires_at?: string | null
+          android_enrollment_qr_png?: string | null
+          android_enrollment_token_name?: string | null
+          android_enrollment_token_value?: string | null
+          android_management_device_name?: string | null
           battery_level?: number | null
           created_at?: string
           device_secret?: string | null
@@ -145,6 +160,36 @@ export type Database = {
           name?: string
           owner_user_id?: string | null
           push_token?: string | null
+        }
+        Relationships: []
+      }
+      enterprise_config: {
+        Row: {
+          created_at: string
+          default_policy_name: string | null
+          enterprise_name: string | null
+          id: boolean
+          pending_signup_url_name: string | null
+          pending_state: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_policy_name?: string | null
+          enterprise_name?: string | null
+          id?: boolean
+          pending_signup_url_name?: string | null
+          pending_state?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_policy_name?: string | null
+          enterprise_name?: string | null
+          id?: boolean
+          pending_signup_url_name?: string | null
+          pending_state?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
