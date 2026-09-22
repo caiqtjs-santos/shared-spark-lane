@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated/painel'
 import { Route as InstalarTokenRouteImport } from './routes/instalar/$token'
+import { Route as AuthenticatedTiEnterpriseCallbackRouteImport } from './routes/_authenticated/ti/enterprise-callback'
 import { Route as ApiPublicAgentDeviceInfoRouteImport } from './routes/api/public/agent/device-info'
 import { Route as ApiPublicAgentEnrollRouteImport } from './routes/api/public/agent/enroll'
 import { Route as ApiPublicAgentHeartbeatRouteImport } from './routes/api/public/agent/heartbeat'
@@ -43,6 +44,12 @@ const InstalarTokenRoute = InstalarTokenRouteImport.update({
   path: '/instalar/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedTiEnterpriseCallbackRoute =
+  AuthenticatedTiEnterpriseCallbackRouteImport.update({
+    id: '/ti/enterprise-callback',
+    path: '/ti/enterprise-callback',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const ApiPublicAgentDeviceInfoRoute =
   ApiPublicAgentDeviceInfoRouteImport.update({
     id: '/api/public/agent/device-info',
@@ -70,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/painel': typeof AuthenticatedPainelRoute
   '/instalar/$token': typeof InstalarTokenRoute
+  '/ti/enterprise-callback': typeof AuthenticatedTiEnterpriseCallbackRoute
   '/api/public/agent/device-info': typeof ApiPublicAgentDeviceInfoRoute
   '/api/public/agent/enroll': typeof ApiPublicAgentEnrollRoute
   '/api/public/agent/heartbeat': typeof ApiPublicAgentHeartbeatRoute
@@ -80,6 +88,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/painel': typeof AuthenticatedPainelRoute
   '/instalar/$token': typeof InstalarTokenRoute
+  '/ti/enterprise-callback': typeof AuthenticatedTiEnterpriseCallbackRoute
   '/api/public/agent/device-info': typeof ApiPublicAgentDeviceInfoRoute
   '/api/public/agent/enroll': typeof ApiPublicAgentEnrollRoute
   '/api/public/agent/heartbeat': typeof ApiPublicAgentHeartbeatRoute
@@ -92,6 +101,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/painel': typeof AuthenticatedPainelRoute
   '/instalar/$token': typeof InstalarTokenRoute
+  '/_authenticated/ti/enterprise-callback': typeof AuthenticatedTiEnterpriseCallbackRoute
   '/api/public/agent/device-info': typeof ApiPublicAgentDeviceInfoRoute
   '/api/public/agent/enroll': typeof ApiPublicAgentEnrollRoute
   '/api/public/agent/heartbeat': typeof ApiPublicAgentHeartbeatRoute
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/painel'
     | '/instalar/$token'
+    | '/ti/enterprise-callback'
     | '/api/public/agent/device-info'
     | '/api/public/agent/enroll'
     | '/api/public/agent/heartbeat'
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/painel'
     | '/instalar/$token'
+    | '/ti/enterprise-callback'
     | '/api/public/agent/device-info'
     | '/api/public/agent/enroll'
     | '/api/public/agent/heartbeat'
@@ -125,6 +137,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/painel'
     | '/instalar/$token'
+    | '/_authenticated/ti/enterprise-callback'
     | '/api/public/agent/device-info'
     | '/api/public/agent/enroll'
     | '/api/public/agent/heartbeat'
@@ -179,6 +192,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InstalarTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/ti/enterprise-callback': {
+      id: '/_authenticated/ti/enterprise-callback'
+      path: '/ti/enterprise-callback'
+      fullPath: '/ti/enterprise-callback'
+      preLoaderRoute: typeof AuthenticatedTiEnterpriseCallbackRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/api/public/agent/device-info': {
       id: '/api/public/agent/device-info'
       path: '/api/public/agent/device-info'
@@ -212,10 +232,13 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedPainelRoute: typeof AuthenticatedPainelRoute
+  AuthenticatedTiEnterpriseCallbackRoute: typeof AuthenticatedTiEnterpriseCallbackRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPainelRoute: AuthenticatedPainelRoute,
+  AuthenticatedTiEnterpriseCallbackRoute:
+    AuthenticatedTiEnterpriseCallbackRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
