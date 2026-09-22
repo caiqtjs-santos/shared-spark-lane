@@ -17,7 +17,8 @@
       Caminho definido: Android Enterprise — app privado no Managed Google Play + Android Management API (gratuito; exige conta Google/Cloud da empresa).
       DECISÃO (22/09/2026): seguir agora. Empresa SEM Google Workspace → enterprise no modo Managed Google Play Accounts (Google cria a conta de gestão gratuitamente).
   - [x] Passo a passo para quem decide (arquivo: android-enterprise-guia.md)
-  - [ ] Empresa criar projeto no Google Cloud com Android Management API + conta de serviço (chave JSON) — depois add_secret
+  - [ ] Empresa criar projeto no Google Cloud com Android Management API + conta de serviço (chave JSON) — colar em ANDROID_MANAGEMENT_SA_JSON (formulário seguro)
+  - [x] Project ID do Google Cloud guardado (GOOGLE_CLOUD_PROJECT_ID = long-carving-509414-d3)
   - [ ] Integrar Android Management API no backend (signup URL, criação da enterprise, token de enrollment, política do aparelho, QR de provisionamento)
   - [ ] Publicar o app como app privado no Managed Google Play (AAB assinado)
   - [ ] Ajustar fluxo de ativação: QR de provisionamento no lugar do download de APK
