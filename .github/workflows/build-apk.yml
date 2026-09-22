@@ -34,16 +34,16 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Conferir se a chave de assinatura está configurada
-        if: ${{ secrets.KEYSTORE_BASE64 == '' }}
-        run: |
-          echo "::error::Falta o secret KEYSTORE_BASE64 (e as senhas) em Settings > Secrets and variables > Actions."
-          exit 1
-
       - name: Decodificar a chave de assinatura (temporária)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Falta o secret KEYSTORE_BASE64 (e as senhas) em Settings > Secrets and variables > Actions."
+            exit 1
+          fi
           mkdir -p "$RUNNER_TEMP/keystore"
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/keystore/release.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/keystore/release.jks"
           echo "KEYSTORE_FILE=$RUNNER_TEMP/keystore/release.jks" >> "$GITHUB_ENV"
 
       - name: Dar permissão de execução ao gradlew
