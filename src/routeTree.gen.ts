@@ -17,7 +17,9 @@ import { Route as InstalarTokenRouteImport } from './routes/instalar/$token'
 import { Route as AuthenticatedTiEnterpriseCallbackRouteImport } from './routes/_authenticated/ti/enterprise-callback'
 import { Route as ApiPublicAgentDeviceInfoRouteImport } from './routes/api/public/agent/device-info'
 import { Route as ApiPublicAgentEnrollRouteImport } from './routes/api/public/agent/enroll'
+import { Route as ApiPublicAgentFrameRouteImport } from './routes/api/public/agent/frame'
 import { Route as ApiPublicAgentHeartbeatRouteImport } from './routes/api/public/agent/heartbeat'
+import { Route as ApiPublicAgentInputRouteImport } from './routes/api/public/agent/input'
 import { Route as ApiPublicAgentSessionRouteImport } from './routes/api/public/agent/session'
 
 const IndexRoute = IndexRouteImport.update({
@@ -61,9 +63,19 @@ const ApiPublicAgentEnrollRoute = ApiPublicAgentEnrollRouteImport.update({
   path: '/api/public/agent/enroll',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicAgentFrameRoute = ApiPublicAgentFrameRouteImport.update({
+  id: '/api/public/agent/frame',
+  path: '/api/public/agent/frame',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicAgentHeartbeatRoute = ApiPublicAgentHeartbeatRouteImport.update({
   id: '/api/public/agent/heartbeat',
   path: '/api/public/agent/heartbeat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicAgentInputRoute = ApiPublicAgentInputRouteImport.update({
+  id: '/api/public/agent/input',
+  path: '/api/public/agent/input',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicAgentSessionRoute = ApiPublicAgentSessionRouteImport.update({
@@ -80,7 +92,9 @@ export interface FileRoutesByFullPath {
   '/ti/enterprise-callback': typeof AuthenticatedTiEnterpriseCallbackRoute
   '/api/public/agent/device-info': typeof ApiPublicAgentDeviceInfoRoute
   '/api/public/agent/enroll': typeof ApiPublicAgentEnrollRoute
+  '/api/public/agent/frame': typeof ApiPublicAgentFrameRoute
   '/api/public/agent/heartbeat': typeof ApiPublicAgentHeartbeatRoute
+  '/api/public/agent/input': typeof ApiPublicAgentInputRoute
   '/api/public/agent/session': typeof ApiPublicAgentSessionRoute
 }
 export interface FileRoutesByTo {
@@ -91,7 +105,9 @@ export interface FileRoutesByTo {
   '/ti/enterprise-callback': typeof AuthenticatedTiEnterpriseCallbackRoute
   '/api/public/agent/device-info': typeof ApiPublicAgentDeviceInfoRoute
   '/api/public/agent/enroll': typeof ApiPublicAgentEnrollRoute
+  '/api/public/agent/frame': typeof ApiPublicAgentFrameRoute
   '/api/public/agent/heartbeat': typeof ApiPublicAgentHeartbeatRoute
+  '/api/public/agent/input': typeof ApiPublicAgentInputRoute
   '/api/public/agent/session': typeof ApiPublicAgentSessionRoute
 }
 export interface FileRoutesById {
@@ -104,7 +120,9 @@ export interface FileRoutesById {
   '/_authenticated/ti/enterprise-callback': typeof AuthenticatedTiEnterpriseCallbackRoute
   '/api/public/agent/device-info': typeof ApiPublicAgentDeviceInfoRoute
   '/api/public/agent/enroll': typeof ApiPublicAgentEnrollRoute
+  '/api/public/agent/frame': typeof ApiPublicAgentFrameRoute
   '/api/public/agent/heartbeat': typeof ApiPublicAgentHeartbeatRoute
+  '/api/public/agent/input': typeof ApiPublicAgentInputRoute
   '/api/public/agent/session': typeof ApiPublicAgentSessionRoute
 }
 export interface FileRouteTypes {
@@ -117,7 +135,9 @@ export interface FileRouteTypes {
     | '/ti/enterprise-callback'
     | '/api/public/agent/device-info'
     | '/api/public/agent/enroll'
+    | '/api/public/agent/frame'
     | '/api/public/agent/heartbeat'
+    | '/api/public/agent/input'
     | '/api/public/agent/session'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -128,7 +148,9 @@ export interface FileRouteTypes {
     | '/ti/enterprise-callback'
     | '/api/public/agent/device-info'
     | '/api/public/agent/enroll'
+    | '/api/public/agent/frame'
     | '/api/public/agent/heartbeat'
+    | '/api/public/agent/input'
     | '/api/public/agent/session'
   id:
     | '__root__'
@@ -140,7 +162,9 @@ export interface FileRouteTypes {
     | '/_authenticated/ti/enterprise-callback'
     | '/api/public/agent/device-info'
     | '/api/public/agent/enroll'
+    | '/api/public/agent/frame'
     | '/api/public/agent/heartbeat'
+    | '/api/public/agent/input'
     | '/api/public/agent/session'
   fileRoutesById: FileRoutesById
 }
@@ -151,7 +175,9 @@ export interface RootRouteChildren {
   InstalarTokenRoute: typeof InstalarTokenRoute
   ApiPublicAgentDeviceInfoRoute: typeof ApiPublicAgentDeviceInfoRoute
   ApiPublicAgentEnrollRoute: typeof ApiPublicAgentEnrollRoute
+  ApiPublicAgentFrameRoute: typeof ApiPublicAgentFrameRoute
   ApiPublicAgentHeartbeatRoute: typeof ApiPublicAgentHeartbeatRoute
+  ApiPublicAgentInputRoute: typeof ApiPublicAgentInputRoute
   ApiPublicAgentSessionRoute: typeof ApiPublicAgentSessionRoute
 }
 
@@ -213,11 +239,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAgentEnrollRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/agent/frame': {
+      id: '/api/public/agent/frame'
+      path: '/api/public/agent/frame'
+      fullPath: '/api/public/agent/frame'
+      preLoaderRoute: typeof ApiPublicAgentFrameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/agent/heartbeat': {
       id: '/api/public/agent/heartbeat'
       path: '/api/public/agent/heartbeat'
       fullPath: '/api/public/agent/heartbeat'
       preLoaderRoute: typeof ApiPublicAgentHeartbeatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/agent/input': {
+      id: '/api/public/agent/input'
+      path: '/api/public/agent/input'
+      fullPath: '/api/public/agent/input'
+      preLoaderRoute: typeof ApiPublicAgentInputRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/agent/session': {
@@ -251,7 +291,9 @@ const rootRouteChildren: RootRouteChildren = {
   InstalarTokenRoute: InstalarTokenRoute,
   ApiPublicAgentDeviceInfoRoute: ApiPublicAgentDeviceInfoRoute,
   ApiPublicAgentEnrollRoute: ApiPublicAgentEnrollRoute,
+  ApiPublicAgentFrameRoute: ApiPublicAgentFrameRoute,
   ApiPublicAgentHeartbeatRoute: ApiPublicAgentHeartbeatRoute,
+  ApiPublicAgentInputRoute: ApiPublicAgentInputRoute,
   ApiPublicAgentSessionRoute: ApiPublicAgentSessionRoute,
 }
 export const routeTree = rootRouteImport
