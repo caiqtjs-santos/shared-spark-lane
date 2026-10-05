@@ -635,6 +635,13 @@ function ScreenView({ deviceId, mode }: { deviceId: string; mode: "visualizacao"
 
   const pointerStart = useRef<{ x: number; y: number; t: number } | null>(null);
 
+  // Proporção (largura/altura) do frame recebido. A moldura acompanha essa
+  // proporção para a imagem ocupar a área inteira, sem faixas laterais: é o
+  // que garante que a fração do toque calculada sobre a moldura seja a mesma
+  // fração sobre a tela do aparelho. Com a moldura fixa em 9:16, telas mais
+  // altas (a maioria dos celulares atuais) deslocavam o toque na horizontal.
+  const [frameAspect, setFrameAspect] = useState<number | null>(null);
+
   function fractionFromEvent(e: ReactPointerEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
@@ -675,10 +682,14 @@ function ScreenView({ deviceId, mode }: { deviceId: string; mode: "visualizacao"
 
   return (
     <div
-      className="relative mx-auto aspect-[9/16] w-full max-w-[220px] overflow-hidden rounded-2xl bg-black/90 select-none"
+      className="relative mx-auto w-full max-w-[220px] overflow-hidden rounded-2xl bg-black/90 select-none"
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
-      style={{ touchAction: mode === "controle" ? "none" : undefined, cursor: mode === "controle" ? "crosshair" : "default" }}
+      style={{
+        aspectRatio: frameAspect ?? 9 / 16,
+        touchAction: mode === "controle" ? "none" : undefined,
+        cursor: mode === "controle" ? "crosshair" : "default",
+      }}
     >
       {frame.data?.found && frame.data.url ? (
         <img
@@ -686,6 +697,12 @@ function ScreenView({ deviceId, mode }: { deviceId: string; mode: "visualizacao"
           alt={`Tela do aparelho`}
           className="pointer-events-none h-full w-full object-contain"
           draggable={false}
+          onLoad={(e) => {
+            const { naturalWidth, naturalHeight } = e.currentTarget;
+            if (naturalWidth > 0 && naturalHeight > 0) {
+              setFrameAspect(naturalWidth / naturalHeight);
+            }
+          }}
         />
       ) : (
         <div className="flex h-full items-center justify-center p-4 text-center text-[11px] text-white/60">
