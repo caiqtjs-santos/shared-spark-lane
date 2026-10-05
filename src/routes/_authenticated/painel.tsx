@@ -1,10 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient, queryOptions } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
   getWorkspace,
-  createDevice,
+  createOwnDevice,
   acceptEnrollment,
   revokeDevice,
   startSession,
@@ -14,7 +14,9 @@ import {
   getEnterpriseStatus,
   startEnterpriseSignup,
   createDeviceQrProvisioning,
+  checkAndroidCredentials,
 } from "@/lib/enterprise.functions";
+import { getDeviceFrameUrl, sendDeviceInput } from "@/lib/screen.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -109,15 +111,21 @@ function TiView({ data }: { data: Workspace }) {
   const qc = useQueryClient();
   const invalidate = () => qc.invalidateQueries({ queryKey: ["workspace"] });
 
-  const [name, setName] = useState("Celular corporativo");
-  const [model, setModel] = useState("Moto G54");
-  const [ownerLoginCode, setOwnerLoginCode] = useState("");
-  const [pendingToken, setPendingToken] = useState<{ id: string; token: string } | null>(null);
   const [qrByDevice, setQrByDevice] = useState<Record<string, string>>({});
 
   const enterpriseStatus = useQuery({
     queryKey: ["enterprise-status"],
     queryFn: useServerFn(getEnterpriseStatus),
+  });
+  // Só roda quando o TI pedir explicitamente (botão "Verificar
+  // configuração") - essa etapa do Android Enterprise é opcional por
+  // enquanto, então não faz sentido já abrir a tela mostrando um erro de
+  // uma integração que ainda não foi configurada de propósito.
+  const credentialsCheck = useQuery({
+    queryKey: ["android-credentials-check"],
+    queryFn: useServerFn(checkAndroidCredentials),
+    enabled: false,
+    retry: false,
   });
   const startEnterprise = useMutation({
     mutationFn: useServerFn(startEnterpriseSignup),
@@ -131,24 +139,6 @@ function TiView({ data }: { data: Workspace }) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const create = useMutation({
-    mutationFn: useServerFn(createDevice),
-    onSuccess: (res: { deviceId: string; enrollmentToken: string }) => {
-      setPendingToken({ id: res.deviceId, token: res.enrollmentToken });
-      toast.success("Aparelho cadastrado. Envie o código de ativação para o profissional.");
-      invalidate();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const accept = useMutation({
-    mutationFn: useServerFn(acceptEnrollment),
-    onSuccess: () => {
-      toast.success("Aparelho ativado.");
-      setPendingToken(null);
-      invalidate();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
   const revoke = useMutation({
     mutationFn: useServerFn(revokeDevice),
     onSuccess: () => {
@@ -161,10 +151,24 @@ function TiView({ data }: { data: Workspace }) {
   return (
     <div className="grid gap-6 md:grid-cols-2">
       <section className="rounded-2xl border border-border bg-card p-6 md:col-span-2">
-        <h2 className="font-display text-base">Android Enterprise (Managed Google Play)</h2>
+        <div className="mt-1 flex items-center gap-2">
+          <h2 className="font-display text-base">Android Enterprise (Managed Google Play)</h2>
+          {!enterpriseStatus.isLoading && !enterpriseStatus.data?.configured && (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+              Opcional por enquanto
+            </span>
+          )}
+        </div>
         <p className="mt-1 text-xs text-muted-foreground">
           O Google Play Protect bloqueia a instalação do app fora de um canal validado. Este modo
           resolve isso: o aparelho é provisionado por QR code em vez de baixar o .apk diretamente.
+          {!enterpriseStatus.isLoading && !enterpriseStatus.data?.configured && (
+            <>
+              {" "}
+              Enquanto isso não estiver configurado, cada profissional gera e ativa o próprio
+              link manualmente (modo de teste) na própria tela.
+            </>
+          )}
         </p>
         {enterpriseStatus.isLoading ? (
           <p className="mt-3 text-sm text-muted-foreground">Verificando status...</p>
@@ -173,118 +177,44 @@ function TiView({ data }: { data: Workspace }) {
             Configurado — <span className="font-mono text-xs">{enterpriseStatus.data.enterpriseName}</span>
           </p>
         ) : (
-          <Button
-            className="mt-3"
-            onClick={() =>
-              startEnterprise.mutate({
-                data: { callbackBaseUrl: window.location.origin },
-              })
-            }
-            disabled={startEnterprise.isPending}
-          >
-            {startEnterprise.isPending ? "Abrindo cadastro..." : "Configurar Android Enterprise"}
-          </Button>
-        )}
-      </section>
-
-      <section className="rounded-2xl border border-border bg-card p-6">
-        <h2 className="font-display text-base">Cadastrar aparelho</h2>
-        <form
-          className="mt-4 space-y-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (ownerLoginCode.length !== 6) {
-              toast.error("O código do profissional precisa ter 6 dígitos.");
-              return;
-            }
-            create.mutate({ data: { name, model, ownerLoginCode } });
-          }}
-        >
-          <div className="space-y-1">
-            <Label>Nome</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label>Modelo</Label>
-            <Input value={model} onChange={(e) => setModel(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label>Código do profissional dono</Label>
-            <Input
-              value={ownerLoginCode}
-              onChange={(e) => setOwnerLoginCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              placeholder="000000"
-              className="font-mono tracking-widest"
-              inputMode="numeric"
-              maxLength={6}
-            />
-            {ownerLoginCode.length > 0 && ownerLoginCode.length < 6 && (
-              <p className="text-xs text-muted-foreground">Faltam {6 - ownerLoginCode.length} dígitos.</p>
+          <>
+            {credentialsCheck.data && !credentialsCheck.data.ok && (
+              <div className="mt-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+                <p className="text-sm text-destructive">{credentialsCheck.data.message}</p>
+              </div>
             )}
-          </div>
-          <Button
-            type="submit"
-            disabled={create.isPending || ownerLoginCode.length !== 6}
-            className="w-full"
-          >
-            {create.isPending ? "Cadastrando..." : "Baixar e ativar app de gestão"}
-          </Button>
-        </form>
-
-        {pendingToken && (
-          <div className="mt-6 rounded-lg border border-primary/40 bg-primary/5 p-4">
-            <p className="text-sm text-foreground">
-              Envie este link para o profissional abrir <strong>no próprio celular</strong> que
-              ele quer poder acessar remotamente. Um único aceite conclui tudo.
-            </p>
-            <div className="mt-3 flex items-center gap-2">
-              <input
-                readOnly
-                value={
-                  typeof window !== "undefined"
-                    ? `${window.location.origin}/instalar/${pendingToken.token}`
-                    : ""
-                }
-                onFocus={(e) => e.currentTarget.select()}
-                className="w-full truncate rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs"
-              />
+            {credentialsCheck.data?.ok && (
+              <p className="mt-3 text-xs text-muted-foreground">{credentialsCheck.data.message}</p>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2">
               <Button
-                type="button"
-                size="sm"
                 variant="outline"
-                onClick={() => {
-                  navigator.clipboard?.writeText(
-                    `${window.location.origin}/instalar/${pendingToken.token}`,
-                  );
-                  toast.success("Link copiado.");
-                }}
+                onClick={() => credentialsCheck.refetch()}
+                disabled={credentialsCheck.isFetching}
               >
-                Copiar
+                {credentialsCheck.isFetching ? "Verificando..." : "Verificar configuração"}
+              </Button>
+              <Button
+                onClick={() =>
+                  startEnterprise.mutate({
+                    data: { callbackBaseUrl: window.location.origin },
+                  })
+                }
+                disabled={startEnterprise.isPending}
+              >
+                {startEnterprise.isPending ? "Abrindo cadastro..." : "Configurar Android Enterprise"}
               </Button>
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">
-              O instalador do app Android ainda está em desenvolvimento. Enquanto isso, use o
-              botão abaixo para concluir a ativação manualmente (útil para testes sem um aparelho
-              real).
-            </p>
-            <Button
-              className="mt-3 w-full"
-              variant="outline"
-              onClick={() =>
-                accept.mutate({
-                  data: { deviceId: pendingToken.id, enrollmentToken: pendingToken.token },
-                })
-              }
-              disabled={accept.isPending}
-            >
-              {accept.isPending ? "Ativando..." : "Concluir ativação manualmente (teste)"}
-            </Button>
-          </div>
+          </>
         )}
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-6">
+      <section className="rounded-2xl border border-border bg-card p-6 md:col-span-2">
         <h2 className="font-display text-base">Aparelhos cadastrados</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Cada profissional gera o próprio link de ativação na própria tela - não precisa mais
+          cadastrar aqui antes. Esta lista é só pra acompanhar/revogar.
+        </p>
         <ul className="mt-4 space-y-3">
           {data.devices.length === 0 && (
             <li className="text-sm text-muted-foreground">Nenhum aparelho cadastrado ainda.</li>
@@ -376,6 +306,28 @@ function ProfissionalView({ data }: { data: Workspace }) {
     "Esqueci o celular em casa e preciso liberar um pagamento.",
   );
   const [mode, setMode] = useState<"visualizacao" | "controle">("controle");
+  const [deviceName, setDeviceName] = useState("Meu celular");
+
+  // Autoatendimento (decisão 05/10/2026, ver roadmap.md): a própria pessoa
+  // gera o link de ativação do próprio aparelho, sem precisar de TI nem de
+  // código de ninguém. Quem gera o link já fica dono - owner_user_id é
+  // sempre quem chamou createOwnDevice.
+  const createOwn = useMutation({
+    mutationFn: useServerFn(createOwnDevice),
+    onSuccess: () => {
+      toast.success("Link gerado. Abra-o no próprio celular que você quer acessar remotamente.");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const acceptSelf = useMutation({
+    mutationFn: useServerFn(acceptEnrollment),
+    onSuccess: () => {
+      toast.success("Aparelho ativado.");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const start = useMutation({
     mutationFn: useServerFn(startSession),
@@ -396,11 +348,26 @@ function ProfissionalView({ data }: { data: Workspace }) {
 
   if (!primary) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-8 text-center">
+      <div className="mx-auto max-w-md rounded-2xl border border-border bg-card p-8 text-center">
         <p className="text-muted-foreground">
-          Nenhum aparelho vinculado à sua conta ainda. Peça ao TI para cadastrar um usando seu
-          código {data.profile?.login_code}.
+          Você ainda não tem um celular vinculado. Gere o link de ativação e abra-o{" "}
+          <strong>no próprio celular</strong> que você quer poder acessar remotamente.
         </p>
+        <form
+          className="mt-6 space-y-3 text-left"
+          onSubmit={(e) => {
+            e.preventDefault();
+            createOwn.mutate({ data: { name: deviceName } });
+          }}
+        >
+          <div className="space-y-1">
+            <Label>Nome do aparelho</Label>
+            <Input value={deviceName} onChange={(e) => setDeviceName(e.target.value)} />
+          </div>
+          <Button type="submit" className="w-full" disabled={createOwn.isPending}>
+            {createOwn.isPending ? "Gerando..." : "Gerar link de ativação"}
+          </Button>
+        </form>
       </div>
     );
   }
@@ -449,10 +416,22 @@ function ProfissionalView({ data }: { data: Workspace }) {
               </Button>
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
-              O app de gestão que esse link instala ainda está em desenvolvimento — a ativação
-              final, por enquanto, é concluída pelo TI. O link e a página já funcionam de verdade;
-              falta só o instalador do celular.
+              O app de gestão que esse link instala ainda está em desenvolvimento. Enquanto isso,
+              use o botão abaixo para concluir a ativação manualmente (útil para testar sem
+              esperar o instalador real do celular).
             </p>
+            <Button
+              className="mt-3 w-full"
+              variant="outline"
+              onClick={() =>
+                acceptSelf.mutate({
+                  data: { deviceId: primary.id, enrollmentToken: primary.enrollment_token ?? "" },
+                })
+              }
+              disabled={acceptSelf.isPending || !primary.enrollment_token}
+            >
+              {acceptSelf.isPending ? "Ativando..." : "Concluir ativação manualmente (teste)"}
+            </Button>
           </div>
         </section>
 
@@ -480,6 +459,7 @@ function ProfissionalView({ data }: { data: Workspace }) {
         </p>
 
         <PhoneMirror
+          deviceId={primary.id}
           deviceName={primary.name}
           activeSession={activeSession}
           reason={reason}
@@ -509,8 +489,14 @@ function ProfissionalView({ data }: { data: Workspace }) {
  * "aparelho gerenciado pela empresa" e o gesto de arrastar para
  * desbloquear em vez de um botão comum. Sem sessão ativa, mostra a tela
  * de bloqueio; a sessão real só começa quando o arraste chega ao fim.
+ *
+ * Enquanto há sessão ativa, mostra o último frame que o aparelho mandou
+ * (poucos por segundo - ver screen.functions.ts e o roadmap para o porquê
+ * de não ser um vídeo WebRTC de verdade) e, em modo "controle", converte
+ * toque/arraste sobre a imagem em comandos enviados para o aparelho.
  */
 function PhoneMirror({
+  deviceId,
   deviceName,
   activeSession,
   reason,
@@ -522,6 +508,7 @@ function PhoneMirror({
   starting,
   stopping,
 }: {
+  deviceId: string;
   deviceName: string;
   activeSession: Workspace["sessions"][number] | undefined;
   reason: string;
@@ -564,17 +551,8 @@ function PhoneMirror({
         {activeSession ? (
           <>
             <div className="flex-1">
-              <div className="grid grid-cols-3 gap-3 pt-4">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="flex aspect-square items-center justify-center rounded-2xl bg-foreground/5 text-[10px] text-muted-foreground"
-                  >
-                    app
-                  </div>
-                ))}
-              </div>
-              <p className="mt-4 text-center text-[11px] text-muted-foreground">
+              <ScreenView deviceId={deviceId} mode={activeSession.mode as "visualizacao" | "controle"} />
+              <p className="mt-2 text-center text-[11px] text-muted-foreground">
                 {deviceName} · modo {activeSession.mode === "controle" ? "controle" : "visualização"} ·
                 iniciada às{" "}
                 {new Date(activeSession.started_at).toLocaleTimeString("pt-BR", {
@@ -629,6 +607,92 @@ function PhoneMirror({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Busca em polling o último frame da tela do aparelho (ver
+ * screen.functions.ts) e, em modo "controle", converte toque/arraste feito
+ * sobre a imagem em coordenadas normalizadas (0 a 1) enviadas via
+ * sendDeviceInput. 800ms de intervalo é um meio-termo - mais rápido que
+ * isso só aumenta custo de Storage sem ganho visível, dado que o aparelho
+ * também só captura poucos frames por segundo do lado dele.
+ */
+function ScreenView({ deviceId, mode }: { deviceId: string; mode: "visualizacao" | "controle" }) {
+  const fetchFrameUrl = useServerFn(getDeviceFrameUrl);
+  const frame = useQuery({
+    queryKey: ["device-frame", deviceId],
+    queryFn: () => fetchFrameUrl({ data: { deviceId } }),
+    refetchInterval: 800,
+    refetchIntervalInBackground: true,
+  });
+
+  const sendInput = useMutation({
+    mutationFn: useServerFn(sendDeviceInput),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const pointerStart = useRef<{ x: number; y: number; t: number } | null>(null);
+
+  function fractionFromEvent(e: ReactPointerEvent<HTMLDivElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    const y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+    return { x, y };
+  }
+
+  function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    if (mode !== "controle") return;
+    const { x, y } = fractionFromEvent(e);
+    pointerStart.current = { x, y, t: Date.now() };
+  }
+
+  function handlePointerUp(e: ReactPointerEvent<HTMLDivElement>) {
+    if (mode !== "controle" || !pointerStart.current) return;
+    const start = pointerStart.current;
+    pointerStart.current = null;
+    const end = fractionFromEvent(e);
+    const durationMs = Date.now() - start.t;
+    const distance = Math.hypot(end.x - start.x, end.y - start.y);
+
+    if (distance < 0.02) {
+      sendInput.mutate({ data: { deviceId, kind: "tap", x: start.x, y: start.y } });
+    } else {
+      sendInput.mutate({
+        data: {
+          deviceId,
+          kind: "swipe",
+          x: start.x,
+          y: start.y,
+          x2: end.x,
+          y2: end.y,
+          durationMs: Math.min(5000, Math.max(50, durationMs)),
+        },
+      });
+    }
+  }
+
+  return (
+    <div
+      className="relative mx-auto aspect-[9/16] w-full max-w-[220px] overflow-hidden rounded-2xl bg-black/90 select-none"
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      style={{ touchAction: mode === "controle" ? "none" : undefined, cursor: mode === "controle" ? "crosshair" : "default" }}
+    >
+      {frame.data?.found && frame.data.url ? (
+        <img
+          src={frame.data.url}
+          alt={`Tela do aparelho`}
+          className="pointer-events-none h-full w-full object-contain"
+          draggable={false}
+        />
+      ) : (
+        <div className="flex h-full items-center justify-center p-4 text-center text-[11px] text-white/60">
+          Aguardando o aparelho começar a enviar a tela... (ele precisa estar com a permissão de
+          captura de tela concedida)
+        </div>
+      )}
     </div>
   );
 }

@@ -123,37 +123,32 @@ export const getWorkspace = createServerFn({ method: "GET" })
     };
   });
 
-/** TI cadastra o aparelho e recebe o token de ativação para o app do celular. */
-export const createDevice = createServerFn({ method: "POST" })
+/**
+ * Autoatendimento: a própria pessoa gera o link de ativação do PRÓPRIO
+ * aparelho, sem precisar de TI nem de código de ninguém - decisão de
+ * 05/10/2026 (ver roadmap.md) pra tirar o passo manual de "TI digita o
+ * código do profissional antes de gerar o link". Quem gera é quem fica
+ * dono: owner_user_id é sempre o próprio chamador.
+ */
+export const createOwnDevice = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    parseInput(
-      z.object({
-        name: z.string().min(1, "Informe um nome para o aparelho.").max(80),
-        model: z.string().min(1, "Informe o modelo do aparelho.").max(80),
-        ownerLoginCode: sixDigits,
-      }),
-      input,
-    ),
+    parseInput(z.object({ name: z.string().min(1, "Informe um nome para o aparelho.").max(80) }), input),
   )
   .handler(async ({ data, context }) => {
-    if (!(await isTi(context))) throw new Error("Apenas o time de TI pode cadastrar aparelhos.");
     const db = await admin();
-
-    const { data: owner } = await db
-      .from("profiles")
-      .select("id, name")
-      .eq("login_code", data.ownerLoginCode)
-      .maybeSingle();
-    if (!owner) throw new Error("Nenhum profissional encontrado com esse código de acesso.");
 
     const enrollmentToken = crypto.randomUUID();
     const { data: device, error } = await db
       .from("devices")
       .insert({
-        owner_user_id: owner.id,
+        owner_user_id: context.userId,
         name: data.name,
-        model: data.model,
+        // Placeholder - o app Android manda o modelo real (Build.MODEL) no
+        // enrollment e sobrescreve isso automaticamente (ver enroll.ts). Não
+        // faz sentido pedir pra digitar um modelo que a gente vai saber de
+        // verdade em poucos segundos, assim que a pessoa abrir o link.
+        model: "A confirmar na ativação",
         enrollment_status: "pendente",
         enrollment_token: enrollmentToken,
       })
@@ -165,13 +160,17 @@ export const createDevice = createServerFn({ method: "POST" })
       event_type: "enrollment_iniciado",
       device_id: device.id,
       user_id: context.userId,
-      details: { owner: owner.name },
     });
 
     return { deviceId: device.id as string, enrollmentToken };
   });
 
-/** O "único aceite": conclui o cadastro do aparelho e deixa registro. */
+/**
+ * O "único aceite": conclui o cadastro do aparelho e deixa registro. TI
+ * pode concluir qualquer um (suporte); o dono do aparelho também pode
+ * concluir o próprio - útil pra testar sem esperar o instalador Android
+ * real, que ainda está em desenvolvimento (ver roadmap.md).
+ */
 export const acceptEnrollment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -184,15 +183,16 @@ export const acceptEnrollment = createServerFn({ method: "POST" })
     ),
   )
   .handler(async ({ data, context }) => {
-    if (!(await isTi(context))) throw new Error("Apenas o time de TI pode concluir a ativação.");
     const db = await admin();
 
     const { data: device } = await db
       .from("devices")
-      .select("id, enrollment_token, enrollment_status")
+      .select("id, owner_user_id, enrollment_token, enrollment_status")
       .eq("id", data.deviceId)
       .maybeSingle();
     if (!device) throw new Error("Aparelho não encontrado.");
+    if (device.owner_user_id !== context.userId && !(await isTi(context)))
+      throw new Error("Você só pode concluir a ativação do próprio aparelho.");
     if (device.enrollment_token !== data.enrollmentToken)
       throw new Error("Token de ativação inválido.");
 

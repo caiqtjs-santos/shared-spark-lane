@@ -19,18 +19,23 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * A parte que já dá para validar sem hardware nenhum além do próprio
- * celular: enquanto o app está enrolled, este serviço consulta
- * periodicamente GET /api/public/agent/session (ver ApiClient.fetchActiveSession)
- * e liga/desliga a notificação PERSISTENTE de "sessão ativa" de acordo com
- * a resposta real do backend - é o mecanismo de consentimento visível
- * funcionando de ponta a ponta, mesmo sem espelhar a tela ainda.
+ * Enquanto o app está enrolled, este serviço consulta periodicamente
+ * GET /api/public/agent/session (ver ApiClient.fetchActiveSession) e
+ * liga/desliga a notificação PERSISTENTE de "sessão ativa" de acordo com a
+ * resposta real do backend - é o mecanismo de consentimento visível
+ * funcionando de ponta a ponta.
  *
- * O que ainda NÃO faz: se activeSession.mode == "controle", deveria também
- * pedir a permissão de MediaProjection (MainActivity.requestScreenCapturePermission)
- * e subir o ScreenCaptureService de verdade. Isso fica para quando a
- * captura de tela em si estiver implementada - hoje ligar isso sem o
- * pipeline de vídeo só criaria uma notificação a mais sem função.
+ * Quando aparece uma sessão ativa (visualização OU controle - os dois
+ * modos precisam de captura de tela; só o modo controle usa o
+ * RemoteAccessibilityService além disso) e a captura ainda não está
+ * rodando, traz a MainActivity para frente para ela pedir a permissão de
+ * MediaProjection - isso NÃO pode ser feito por um serviço em segundo
+ * plano sozinho, o Android exige uma Activity em primeiro plano para
+ * mostrar esse diálogo de consentimento (ver MainActivity.onNewIntent e
+ * requestScreenCapturePermission). Trazer o app para frente sem avisar é
+ * um comportamento visível e esperado aqui - é o próprio diálogo do
+ * sistema que serve de consentimento, consistente com o princípio de
+ * transparência do projeto.
  */
 class SessionWatcherService : Service() {
 
@@ -67,6 +72,9 @@ class SessionWatcherService : Service() {
                 apiClient.heartbeat(deviceId, deviceSecret, readBatteryLevel())
                 val session = apiClient.fetchActiveSession(deviceId, deviceSecret)
                 updateNotification(session)
+                if (session != null && !ScreenCaptureService.isRunning) {
+                    requestCaptureViaMainActivity()
+                }
             } catch (e: Exception) {
                 // Rede instável é esperado (celular fora do wifi, sem sinal
                 // momentaneamente) - não derruba o serviço, só tenta de novo
@@ -75,6 +83,21 @@ class SessionWatcherService : Service() {
 
             delay(POLL_INTERVAL_MS)
         }
+    }
+
+    /**
+     * Abre a MainActivity por cima do que a pessoa estiver usando, com o
+     * extra EXTRA_AUTO_REQUEST_CAPTURE, para ela já disparar o diálogo de
+     * permissão de captura de tela sozinha (ver MainActivity.onNewIntent).
+     * FLAG_ACTIVITY_NEW_TASK é obrigatório para iniciar uma Activity a
+     * partir de um Service.
+     */
+    private fun requestCaptureViaMainActivity() {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            putExtra(MainActivity.EXTRA_AUTO_REQUEST_CAPTURE, true)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        startActivity(intent)
     }
 
     private fun updateNotification(session: ApiClient.ActiveSession?) {

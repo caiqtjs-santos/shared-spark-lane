@@ -3,8 +3,17 @@
 ## Decisões registradas
 - Android Enterprise / Managed Google Play vale para aparelhos novos e resets planejados, a partir de agora. Não é retrofit em aparelho já em uso (a plataforma não permite sem reset). Configuração única feita pelo TI na entrega do aparelho.
 - Chave de assinatura do app NUNCA no repositório: vive nos secrets do GitHub (KEYSTORE_BASE64, KEYSTORE_STORE_PASSWORD, KEYSTORE_KEY_ALIAS, KEYSTORE_KEY_PASSWORD).
+- DECISÃO (05/10/2026): espelhamento de tela SEM WebRTC/TURN por enquanto — o aparelho manda frames JPEG periódicos pro nosso próprio backend (bucket `device-frames` no Storage), o painel busca em polling, e os toques viram linhas em `session_inputs`. Zero dependência nativa nova no app, zero servidor TURN. Trade-off: poucos frames por segundo, não vídeo contínuo.
+- DECISÃO (05/10/2026): banco de dados movido para um projeto Supabase próprio (`brazmbstdzinxgdydxlk`, organização da conta do dono do projeto), fora do Lovable Cloud. Lovable passa a ser usado só para publicar o frontend, não para hospedar o banco — ver "Bloqueando agora" para o que falta pra essa troca valer de verdade.
+- DECISÃO (05/10/2026): cadastro de aparelho virou autoatendimento. Antes o TI precisava digitar o código do profissional antes de gerar o link (`createDevice`); agora qualquer pessoa logada gera o próprio link direto na própria tela (`createOwnDevice`) — quem gera já fica dono, sem TI no meio. TI continua vendo todos os aparelhos (lista/revogar/QR do Android Enterprise), só não cadastra mais na mão.
 
 ## Bloqueando agora
+- [ ] **Banco novo (brazmbstdzinxgdydxlk) criado e com as migrations aplicadas, mas ainda não é o banco em uso de verdade:**
+  - [ ] Pegar a `service_role` key em supabase.com/dashboard/project/brazmbstdzinxgdydxlk/settings/api-keys e colar nas variáveis de ambiente do Lovable (SUPABASE_SERVICE_ROLE_KEY) — só o dono da conta consegue pegar essa chave, a ferramenta usada aqui não tem acesso a secrets.
+  - [ ] Atualizar em Lovable: SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SERVICE_ROLE_KEY, VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY (valores novos já estão no .env local, exceto a service_role).
+  - [ ] Banco novo está vazio (0 linhas em todas as tabelas, inclusive auth.users) — recriar as contas de TI/profissional pela tela de cadastro normal do app depois da troca.
+  - [ ] Confirmar Auth settings (Site URL / Redirect URLs) no projeto novo, se o login usar algum redirect.
+  - [ ] Depois de confirmar que o banco novo funciona, decidir o que fazer com o projeto antigo do Lovable Cloud (dmbrlzyagmupkivpxwex) — pausar ou excluir.
 - [x] Remover a chave de assinatura do repositório e proteger via .gitignore + secrets
 - [ ] Cadastrar os 4 secrets de assinatura no repositório do GitHub (só você pode fazer)
 
@@ -26,9 +35,10 @@
   - [ ] Ajustar o app Android para rodar como app gerenciado pela política
 - [ ] Testar o fluxo de ativação em 2 toques num Android real
 
-## A função central (ainda só esqueleto)
-- [ ] Ver a tela do celular: ligar a captura (MediaProjection) ao envio de vídeo (WebRTC) — TODO no ScreenCaptureService.kt
-- [ ] Controlar a tela: ligar o painel ao RemoteAccessibilityService (receber toque → injetar)
+## A função central
+- [x] Ver a tela do celular — implementado SEM WebRTC (ver decisão 05/10/2026): MediaProjection → JPEG → upload pro backend → painel busca em polling. Código escrito e revisado, mas **nunca testado num aparelho físico** (ScreenCaptureService.kt).
+- [x] Controlar a tela — toque/arraste no painel vira linha em `session_inputs`, o app consome via polling e injeta via RemoteAccessibilityService. Também não testado em hardware real.
+- [ ] Testar os dois itens acima em um Android de verdade e ajustar o que aparecer (stride de imagem, tempo de resposta do createVirtualDisplay, FRAME_INTERVAL_MS/JPEG_QUALITY).
 
 ## Depois
 - [ ] Projeto Firebase real (falta google-services.json)

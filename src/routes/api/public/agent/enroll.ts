@@ -23,6 +23,12 @@ export const Route = createFileRoute("/api/public/agent/enroll")({
             enrollmentToken: z.string().min(8),
             model: z.string().max(80).optional(),
             pushToken: z.string().max(500).optional(),
+            // Resolução real da tela (px) - usada só para converter o toque
+            // normalizado (0..1) que o painel manda de volta em coordenadas
+            // de pixel reais (ver RemoteAccessibilityService). Não cobre
+            // rotação de tela em tempo real.
+            screenWidth: z.number().int().positive().max(20000).optional(),
+            screenHeight: z.number().int().positive().max(20000).optional(),
           })
           .safeParse(body);
         if (!parsed.success) return json({ error: "Dados inválidos" }, 400);
@@ -48,6 +54,8 @@ export const Route = createFileRoute("/api/public/agent/enroll")({
             last_seen_at: new Date().toISOString(),
             ...(parsed.data.model ? { model: parsed.data.model } : {}),
             ...(parsed.data.pushToken ? { push_token: parsed.data.pushToken } : {}),
+            ...(parsed.data.screenWidth ? { screen_width: parsed.data.screenWidth } : {}),
+            ...(parsed.data.screenHeight ? { screen_height: parsed.data.screenHeight } : {}),
           })
           .eq("id", device.id);
         if (error) return json({ error: error.message }, 500);

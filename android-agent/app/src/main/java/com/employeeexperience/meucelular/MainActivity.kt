@@ -26,10 +26,11 @@ import kotlinx.coroutines.withContext
  * o SessionWatcherService, que é quem mantém o aviso de sessão ativa
  * funcionando mesmo com o app em segundo plano.
  *
- * O pedido de permissão de captura de tela (MediaProjection) continua
- * como próximo passo, condicionado a implementar o pipeline de vídeo em
- * si - não faz sentido pedir uma permissão sensível para uma função que
- * ainda não existe.
+ * Também é trazida para frente automaticamente pela SessionWatcherService
+ * (via EXTRA_AUTO_REQUEST_CAPTURE) quando existe sessão ativa e a captura
+ * de tela ainda não está rodando - só uma Activity em primeiro plano pode
+ * disparar o diálogo de permissão de MediaProjection, um Service sozinho
+ * não consegue (ver handleAutoRequestCapture).
  */
 class MainActivity : AppCompatActivity() {
 
@@ -72,12 +73,27 @@ class MainActivity : AppCompatActivity() {
         }
 
         handleActivationDeepLink(intent)
+        handleAutoRequestCapture(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         handleActivationDeepLink(intent)
+        handleAutoRequestCapture(intent)
+    }
+
+    /**
+     * Atendido quando a SessionWatcherService traz esta tela para frente
+     * (ver SessionWatcherService.requestCaptureViaMainActivity) porque
+     * detectou uma sessão ativa e a captura de tela ainda não está rodando.
+     * Dispara direto o diálogo de permissão do Android - é esse diálogo do
+     * próprio sistema que serve de consentimento visível aqui.
+     */
+    private fun handleAutoRequestCapture(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_AUTO_REQUEST_CAPTURE, false) != true) return
+        if (!deviceStore.isEnrolled) return
+        requestScreenCapturePermission()
     }
 
     /**
@@ -177,7 +193,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Chamado quando o backend sinaliza que uma sessão em modo "controle" foi solicitada. */
+    /**
+     * Mostra o diálogo nativo do Android pedindo permissão de captura de
+     * tela. Chamado automaticamente por handleAutoRequestCapture quando a
+     * SessionWatcherService detecta sessão ativa.
+     */
     fun requestScreenCapturePermission() {
         val projectionManager =
             getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
@@ -208,5 +228,6 @@ class MainActivity : AppCompatActivity() {
     companion object {
         const val REQUEST_CODE_SCREEN_CAPTURE = 100
         const val REQUEST_CODE_NOTIFICATIONS = 200
+        const val EXTRA_AUTO_REQUEST_CAPTURE = "autoRequestCapture"
     }
 }
