@@ -25,24 +25,97 @@ interface ServiceAccountJson {
   project_id?: string;
 }
 
-function readServiceAccount(): ServiceAccountJson {
+export interface CredentialsDiagnostics {
+  ok: boolean;
+  message: string;
+}
+
+/**
+ * Checagem "offline" das duas variáveis de ambiente que a integração
+ * precisa, sem chamar o Google. Existe para o painel conseguir avisar o TI
+ * *antes* de ele clicar em "Configurar Android Enterprise" (que já manda
+ * pro fluxo hospedado do Google) - erro de configuração só aparecer depois
+ * de ir e voltar do Google é tarde e confuso. Também cobre o erro mais
+ * comum que já vimos acontecer na prática: colar o Project ID (em vez do
+ * conteúdo do arquivo .json baixado) no campo ANDROID_MANAGEMENT_SA_JSON.
+ */
+export function diagnoseCredentials(): CredentialsDiagnostics {
   const raw = process.env["ANDROID_MANAGEMENT_SA_JSON"];
+  const projId = process.env["GOOGLE_CLOUD_PROJECT_ID"];
+
   if (!raw) {
-    throw new Error(
-      "ANDROID_MANAGEMENT_SA_JSON não está configurada no ambiente. Cadastre a chave da conta de serviço nas variáveis de ambiente do runtime antes de usar a integração com o Android Enterprise.",
-    );
+    return {
+      ok: false,
+      message:
+        "ANDROID_MANAGEMENT_SA_JSON não está configurada. Cadastre nela o conteúdo completo do " +
+        "arquivo .json da chave da conta de serviço (Google Cloud → IAM e administrador → Contas " +
+        "de serviço → Chaves → Adicionar chave → Criar chave → tipo JSON).",
+    };
   }
+
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith("{")) {
+    const preview = trimmed.slice(0, 24);
+    return {
+      ok: false,
+      message:
+        `O valor em ANDROID_MANAGEMENT_SA_JSON não é o arquivo JSON da conta de serviço - começa ` +
+        `com "${preview}${trimmed.length > 24 ? "..." : ""}", que não é "{". Isso geralmente ` +
+        `acontece quando se cola o Project ID (ou outro texto) no lugar do conteúdo inteiro do ` +
+        `arquivo .json baixado. Abra esse arquivo, copie tudo (de "{" até "}") e cole aqui.`,
+    };
+  }
+
+  let parsed: ServiceAccountJson;
   try {
-    const parsed = JSON.parse(raw) as ServiceAccountJson;
-    if (!parsed.client_email || !parsed.private_key) {
-      throw new Error("faltam client_email e/ou private_key no JSON.");
-    }
-    return parsed;
+    parsed = JSON.parse(trimmed) as ServiceAccountJson;
   } catch (e) {
-    throw new Error(
-      `ANDROID_MANAGEMENT_SA_JSON não é um JSON válido de conta de serviço (${(e as Error).message}).`,
-    );
+    return {
+      ok: false,
+      message:
+        `ANDROID_MANAGEMENT_SA_JSON começa com "{" mas não é um JSON válido ` +
+        `(${(e as Error).message}). Confira se o conteúdo não foi cortado ao colar.`,
+    };
   }
+
+  if (!parsed.client_email || !parsed.private_key) {
+    return {
+      ok: false,
+      message:
+        "O JSON em ANDROID_MANAGEMENT_SA_JSON não tem os campos client_email e/ou private_key. " +
+        "Confira se é mesmo o arquivo de chave de conta de serviço (tipo \"service_account\"), e " +
+        "não outro arquivo do Google Cloud.",
+    };
+  }
+
+  if (!projId) {
+    return {
+      ok: false,
+      message: "GOOGLE_CLOUD_PROJECT_ID não está configurada no ambiente.",
+    };
+  }
+
+  if (parsed.project_id && parsed.project_id !== projId) {
+    return {
+      ok: false,
+      message:
+        `GOOGLE_CLOUD_PROJECT_ID está como "${projId}", mas o JSON da conta de serviço pertence ` +
+        `ao projeto "${parsed.project_id}". Confira se os dois valores não foram trocados entre si.`,
+    };
+  }
+
+  return {
+    ok: true,
+    message: `Credenciais OK - conta de serviço ${parsed.client_email}, projeto ${projId}.`,
+  };
+}
+
+function readServiceAccount(): ServiceAccountJson {
+  const diagnostics = diagnoseCredentials();
+  if (!diagnostics.ok) throw new Error(diagnostics.message);
+  // diagnoseCredentials() já validou o parse acima; refazer aqui é barato e
+  // evita duplicar o tipo de retorno entre as duas funções.
+  return JSON.parse((process.env["ANDROID_MANAGEMENT_SA_JSON"] as string).trim()) as ServiceAccountJson;
 }
 
 function projectId(): string {

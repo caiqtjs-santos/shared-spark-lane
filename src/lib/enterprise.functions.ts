@@ -6,6 +6,7 @@ import {
   completeEnterpriseSignup,
   ensureDefaultPolicy,
   createEnrollmentToken,
+  diagnoseCredentials,
 } from "./android-management.server";
 
 function parseInput<T extends z.ZodTypeAny>(schema: T, input: unknown): z.infer<T> {
@@ -46,6 +47,19 @@ export const getEnterpriseStatus = createServerFn({ method: "GET" })
       configured: Boolean(data?.enterprise_name && data?.default_policy_name),
       enterpriseName: data?.enterprise_name ?? null,
     };
+  });
+
+/**
+ * Checagem rápida (sem chamar o Google) de ANDROID_MANAGEMENT_SA_JSON e
+ * GOOGLE_CLOUD_PROJECT_ID. O painel chama isso assim que o TI abre a aba,
+ * pra avisar de erro de configuração ANTES de mandar ele pro cadastro
+ * hospedado do Google - descobrir só depois de ir e voltar de lá é tarde.
+ */
+export const checkAndroidCredentials = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireTi(context);
+    return diagnoseCredentials();
   });
 
 /**

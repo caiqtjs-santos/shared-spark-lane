@@ -12,11 +12,17 @@ import android.view.accessibility.AccessibilityEvent
  * um aviso claro do que essa permissão permite) - não pode ser ativada
  * silenciosamente por código.
  *
- * A conexão com o canal de dados do WebRTC (recebendo os eventos de toque
- * do painel) ainda precisa ser implementada; aqui está a parte de injeção
- * de gesto, que é a API pública do Android para isso.
+ * Quem chama performTap/performSwipe é o ScreenCaptureService, que faz o
+ * polling de GET /api/public/agent/input e já converte as coordenadas
+ * normalizadas (0..1) vindas do painel em pixels reais antes de chamar
+ * aqui (ver applyPendingInputs em ScreenCaptureService.kt).
  */
 class RemoteAccessibilityService : AccessibilityService() {
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        instance = this
+    }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         // Este serviço não precisa reagir a eventos de acessibilidade da
@@ -26,7 +32,12 @@ class RemoteAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
-    /** Chamado pelo cliente WebRTC quando chega um evento de toque do painel. */
+    override fun onDestroy() {
+        if (instance === this) instance = null
+        super.onDestroy()
+    }
+
+    /** Chamado pelo ScreenCaptureService quando chega um toque do painel. */
     fun performTap(x: Float, y: Float) {
         val path = Path().apply { moveTo(x, y) }
         val gesture = GestureDescription.Builder()
@@ -45,5 +56,12 @@ class RemoteAccessibilityService : AccessibilityService() {
             .addStroke(GestureDescription.StrokeDescription(path, 0, durationMs))
             .build()
         dispatchGesture(gesture, null, null)
+    }
+
+    companion object {
+        /** null enquanto o usuário não concedeu a permissão de Acessibilidade. */
+        @Volatile
+        var instance: RemoteAccessibilityService? = null
+            private set
     }
 }

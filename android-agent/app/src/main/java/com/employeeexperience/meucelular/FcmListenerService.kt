@@ -18,9 +18,11 @@ class FcmListenerService : FirebaseMessagingService() {
         val sessionId = message.data["sessionId"] ?: return
         val mode = message.data["mode"] ?: "visualizacao"
 
-        // TODO: iniciar ScreenCaptureService / SignalingClient com este
-        // sessionId. Se mode == "controle", também verificar se a permissão
-        // de Acessibilidade já foi concedida antes de aceitar a sessão.
+        // TODO: hoje quem dispara a captura é a SessionWatcherService (poll
+        // a cada 15s) trazendo a MainActivity para frente - ver
+        // SessionWatcherService.requestCaptureViaMainActivity. Quando o push
+        // real existir, isso pode fazer o mesmo na hora, sem esperar o
+        // próximo ciclo de poll - sessionId/mode já chegam prontos aqui.
     }
 
     override fun onNewToken(token: String) {

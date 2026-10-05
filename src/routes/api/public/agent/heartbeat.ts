@@ -21,6 +21,11 @@ export const Route = createFileRoute("/api/public/agent/heartbeat")({
           .object({
             batteryLevel: z.number().int().min(0).max(100).optional(),
             pushToken: z.string().max(500).optional(),
+            // Reportado de novo aqui (além do enroll) porque é só quando a
+            // captura de tela realmente começa que o app sabe a resolução
+            // com certeza - ver ScreenCaptureService.startCapture.
+            screenWidth: z.number().int().positive().max(20000).optional(),
+            screenHeight: z.number().int().positive().max(20000).optional(),
           })
           .safeParse(body);
         if (!parsed.success) return json({ error: "Dados inválidos" }, 400);
@@ -33,6 +38,8 @@ export const Route = createFileRoute("/api/public/agent/heartbeat")({
               ? { battery_level: parsed.data.batteryLevel }
               : {}),
             ...(parsed.data.pushToken ? { push_token: parsed.data.pushToken } : {}),
+            ...(parsed.data.screenWidth ? { screen_width: parsed.data.screenWidth } : {}),
+            ...(parsed.data.screenHeight ? { screen_height: parsed.data.screenHeight } : {}),
           })
           .eq("id", device.id);
         if (error) return json({ error: error.message }, 500);

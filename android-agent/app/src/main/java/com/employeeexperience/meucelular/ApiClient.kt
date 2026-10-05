@@ -52,11 +52,25 @@ class ApiClient(private val baseUrl: String = BASE_URL) {
         }
     }
 
-    /** Avisa que o app está vivo, com o nível de bateria atual. */
+    /**
+     * Avisa que o app está vivo, com o nível de bateria atual. screenWidth/
+     * screenHeight são opcionais e só mandados quando a captura de tela
+     * acabou de começar (ver ScreenCaptureService.startCapture) - é o jeito
+     * mais confiável de saber a resolução real, já que pode diferir do que
+     * foi reportado no enrollment (rotação, densidade, etc.).
+     */
     @Throws(IOException::class)
-    fun heartbeat(deviceId: String, deviceSecret: String, batteryLevel: Int?) {
+    fun heartbeat(
+        deviceId: String,
+        deviceSecret: String,
+        batteryLevel: Int?,
+        screenWidth: Int? = null,
+        screenHeight: Int? = null,
+    ) {
         val body = JSONObject().apply {
             if (batteryLevel != null) put("batteryLevel", batteryLevel)
+            if (screenWidth != null) put("screenWidth", screenWidth)
+            if (screenHeight != null) put("screenHeight", screenHeight)
         }.toString().toRequestBody(jsonMediaType)
 
         val request = Request.Builder()
@@ -108,8 +122,68 @@ class ApiClient(private val baseUrl: String = BASE_URL) {
         client.newCall(request).execute().use { response -> response.body?.close() }
     }
 
+    /**
+     * Envia um frame (JPEG) da tela - ver src/routes/api/public/agent/frame.ts.
+     * `active=false` na resposta quer dizer que não há mais sessão ativa
+     * para este aparelho; quem chama deve parar o loop de captura.
+     */
+    @Throws(IOException::class, ApiException::class)
+    fun sendFrame(deviceId: String, deviceSecret: String, frameBase64: String): Boolean {
+        val body = JSONObject().apply { put("frameBase64", frameBase64) }
+            .toString().toRequestBody(jsonMediaType)
+
+        val request = Request.Builder()
+            .url("$baseUrl/api/public/agent/frame")
+            .header("x-device-id", deviceId)
+            .header("x-device-secret", deviceSecret)
+            .post(body)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val json = JSONObject(response.body?.string() ?: "{}")
+            if (!response.isSuccessful) throw ApiException(json.optString("error", "Falha ao enviar frame (${response.code})"))
+            return json.optBoolean("active", true)
+        }
+    }
+
+    /** Toques/arrastos pendentes do painel - ver src/routes/api/public/agent/input.ts. */
+    @Throws(IOException::class, ApiException::class)
+    fun fetchPendingInputs(deviceId: String, deviceSecret: String): List<PendingInput> {
+        val request = Request.Builder()
+            .url("$baseUrl/api/public/agent/input")
+            .header("x-device-id", deviceId)
+            .header("x-device-secret", deviceSecret)
+            .get()
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val json = JSONObject(response.body?.string() ?: "{}")
+            if (!response.isSuccessful) throw ApiException(json.optString("error", "Falha ao consultar toques (${response.code})"))
+            val arr = json.optJSONArray("inputs") ?: return emptyList()
+            return (0 until arr.length()).map { i ->
+                val item = arr.getJSONObject(i)
+                PendingInput(
+                    kind = item.getString("kind"),
+                    x = item.getDouble("x").toFloat(),
+                    y = item.getDouble("y").toFloat(),
+                    x2 = if (item.isNull("x2")) null else item.getDouble("x2").toFloat(),
+                    y2 = if (item.isNull("y2")) null else item.getDouble("y2").toFloat(),
+                    durationMs = if (item.isNull("durationMs")) null else item.getLong("durationMs"),
+                )
+            }
+        }
+    }
+
     data class EnrollResult(val deviceId: String, val deviceSecret: String)
     data class ActiveSession(val id: String, val mode: String, val reason: String, val startedAt: String)
+    data class PendingInput(
+        val kind: String,
+        val x: Float,
+        val y: Float,
+        val x2: Float?,
+        val y2: Float?,
+        val durationMs: Long?,
+    )
 
     companion object {
         // Mesmo domínio onde o painel (TI/profissional) está publicado.
