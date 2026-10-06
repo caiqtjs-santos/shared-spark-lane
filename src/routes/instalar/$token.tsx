@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 /**
- * Página pública que o token de ativação aponta para. Precisa ser aberta
+ * Página pública que o token de ativação aponta para. O link é gerado pelo
+ * TI no painel ("Cadastrar aparelho") e precisa ser aberto
  * NO PRÓPRIO CELULAR que vai ser acessado remotamente — é isso que a
  * torna diferente de um link clicado em qualquer lugar: o app de gestão
  * só existe (ou vai existir) no aparelho onde essa página for aberta.
@@ -53,6 +54,24 @@ function InstalarPage() {
     retry: false,
   });
 
+  // Aceite explícito antes de baixar o app: quem está com o aparelho na mão
+  // (o TI, na preparação antes da entrega) marca a caixa, e isso fica
+  // registrado na auditoria do aparelho (POST em device-info). O botão de
+  // baixar só libera depois do aceite.
+  const [accepted, setAccepted] = useState(false);
+  function handleAcceptChange(checked: boolean) {
+    setAccepted(checked);
+    if (!checked) return;
+    fetch("/api/public/agent/device-info", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token }),
+    }).catch(() => {
+      // Falha de rede aqui não impede a instalação - o registro definitivo
+      // da ativação é feito pelo app, no enrollment.
+    });
+  }
+
   // Tenta abrir o app já instalado, passando o token direto. Se não houver
   // app instalado para tratar o link, o navegador ignora silenciosamente e
   // a pessoa só vê a página normal abaixo - nada quebra nesse caso.
@@ -85,7 +104,7 @@ function InstalarPage() {
             <div className="text-center">
               <p className="text-sm text-destructive">{(error as Error).message}</p>
               <p className="mt-2 text-xs text-muted-foreground">
-                Entre no painel e gere um novo link de ativação.
+                Peça ao time de TI um novo link de ativação.
               </p>
             </div>
           )}
@@ -114,14 +133,33 @@ function InstalarPage() {
               </div>
 
               <ol className="mt-5 space-y-2 text-sm text-muted-foreground">
-                <li>1. Toque em "Baixar app de gestão" abaixo.</li>
+                <li>1. Marque o aceite e toque em "Baixar app de gestão" abaixo.</li>
                 <li>2. Instale o arquivo baixado (o Android vai pedir para autorizar instalação de fora da Play Store — é esperado, e só precisa autorizar uma vez).</li>
                 <li>3. Depois de instalado, toque neste mesmo link de novo (ex: na notificação de download): o app abre sozinho já ativado, sem precisar digitar nada.</li>
               </ol>
 
-              <a href={APK_URL} download>
-                <Button className="mt-6 w-full">Baixar app de gestão</Button>
-              </a>
+              <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-muted/40 px-3 py-3 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-primary"
+                  checked={accepted}
+                  onChange={(e) => handleAcceptChange(e.target.checked)}
+                />
+                <span>
+                  Aceito que este aparelho corporativo seja gerenciado pela empresa e possa ter a
+                  tela acessada remotamente, sempre com aviso visível no aparelho e registro em
+                  auditoria.
+                </span>
+              </label>
+              {accepted ? (
+                <a href={APK_URL} download>
+                  <Button className="mt-4 w-full">Baixar app de gestão</Button>
+                </a>
+              ) : (
+                <Button className="mt-4 w-full" disabled>
+                  Baixar app de gestão
+                </Button>
+              )}
               <p className="mt-3 text-center text-xs text-muted-foreground">
                 O Android é quem exige o passo de instalação manual (não dá para pular por
                 design do sistema) — mas depois de instalado uma vez, ativar fica em 1 toque.

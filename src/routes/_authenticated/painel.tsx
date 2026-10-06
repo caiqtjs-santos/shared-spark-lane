@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
   getWorkspace,
-  createOwnDevice,
+  registerDevice,
   acceptEnrollment,
   revokeDevice,
   startSession,
@@ -44,7 +44,13 @@ export const Route = createFileRoute("/_authenticated/painel")({
 });
 
 const workspaceQuery = (fn: ReturnType<typeof useServerFn<typeof getWorkspace>>) =>
-  queryOptions({ queryKey: ["workspace"], queryFn: () => fn() });
+  queryOptions({
+    queryKey: ["workspace"],
+    queryFn: () => fn(),
+    // O aparelho é ativado no celular, não nesta tela: sem isto, o status só
+    // mudaria de "pendente" para "ativo" depois de recarregar a página.
+    refetchInterval: 10_000,
+  });
 
 function PainelPage() {
   const navigate = useNavigate();
@@ -113,6 +119,58 @@ function TiView({ data }: { data: Workspace }) {
 
   const [qrByDevice, setQrByDevice] = useState<Record<string, string>>({});
 
+  // Cadastro de aparelho pelo TI (decisão de 05/10/2026, ver roadmap.md): o
+  // TI gera o link, abre no celular, dá o aceite e instala o app ANTES de
+  // entregar o aparelho; o profissional recebe o aparelho pronto e o login.
+  const [ownerKind, setOwnerKind] = useState<"novo" | "existente">("novo");
+  const [professionalName, setProfessionalName] = useState("");
+  const [existingCode, setExistingCode] = useState("");
+  const [newDeviceName, setNewDeviceName] = useState("Celular corporativo");
+  const [lastRegistered, setLastRegistered] = useState<{
+    deviceName: string;
+    enrollmentToken: string;
+    owner: { name: string; loginCode: string };
+    password: string | null;
+  } | null>(null);
+
+  const ownersById = new Map(data.owners.map((o) => [o.id, o]));
+  const installLink = (token: string) =>
+    typeof window !== "undefined" ? `${window.location.origin}/instalar/${token}` : "";
+  const copy = (text: string, done: string) => {
+    navigator.clipboard?.writeText(text);
+    toast.success(done);
+  };
+
+  const register = useMutation({
+    mutationFn: useServerFn(registerDevice),
+    onSuccess: (res: {
+      deviceName: string;
+      enrollmentToken: string;
+      owner: { name: string; loginCode: string };
+      password: string | null;
+    }) => {
+      setLastRegistered({
+        deviceName: res.deviceName,
+        enrollmentToken: res.enrollmentToken,
+        owner: res.owner,
+        password: res.password,
+      });
+      setProfessionalName("");
+      setExistingCode("");
+      toast.success("Aparelho cadastrado. Abra o link no celular para ativar.");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const activateWithoutApp = useMutation({
+    mutationFn: useServerFn(acceptEnrollment),
+    onSuccess: () => {
+      toast.success("Aparelho marcado como ativo (sem o app).");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const enterpriseStatus = useQuery({
     queryKey: ["enterprise-status"],
     queryFn: useServerFn(getEnterpriseStatus),
@@ -151,6 +209,167 @@ function TiView({ data }: { data: Workspace }) {
   return (
     <div className="grid gap-6 md:grid-cols-2">
       <section className="rounded-2xl border border-border bg-card p-6 md:col-span-2">
+        <h2 className="font-display text-base">Cadastrar aparelho</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Você gera o link, abre no celular que vai ser acessado, dá o aceite e instala o app. O
+          profissional recebe o aparelho já pronto, junto com o login.
+        </p>
+
+        <form
+          className="mt-4 grid gap-4 md:grid-cols-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (ownerKind === "novo" && professionalName.trim().length < 2) {
+              toast.error("Informe o nome do profissional.");
+              return;
+            }
+            if (ownerKind === "existente" && existingCode.length !== 6) {
+              toast.error("O código do profissional precisa ter 6 dígitos.");
+              return;
+            }
+            register.mutate({
+              data: {
+                deviceName: newDeviceName.trim() || "Celular corporativo",
+                professional:
+                  ownerKind === "novo"
+                    ? { kind: "novo", name: professionalName.trim() }
+                    : { kind: "existente", loginCode: existingCode },
+              },
+            });
+          }}
+        >
+          <div className="space-y-2 md:col-span-2">
+            <Label>Quem vai usar o aparelho</Label>
+            <div className="grid grid-cols-2 gap-2 md:max-w-md">
+              {(["novo", "existente"] as const).map((kind) => (
+                <Button
+                  key={kind}
+                  type="button"
+                  variant={ownerKind === kind ? "default" : "outline"}
+                  onClick={() => setOwnerKind(kind)}
+                >
+                  {kind === "novo" ? "Profissional novo" : "Já tem login"}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {ownerKind === "novo" ? (
+            <div className="space-y-1">
+              <Label htmlFor="professional-name">Nome do profissional</Label>
+              <Input
+                id="professional-name"
+                value={professionalName}
+                onChange={(e) => setProfessionalName(e.target.value)}
+                placeholder="João Pereira"
+              />
+              <p className="text-xs text-muted-foreground">
+                O código de acesso e a senha são gerados no cadastro.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <Label htmlFor="existing-code">Código de acesso do profissional</Label>
+              <Input
+                id="existing-code"
+                inputMode="numeric"
+                maxLength={6}
+                className="font-mono tracking-widest"
+                value={existingCode}
+                onChange={(e) => setExistingCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="000000"
+              />
+              <p className="text-xs text-muted-foreground">
+                Use para trocar o aparelho de quem já tem login.
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <Label htmlFor="new-device-name">Nome do aparelho</Label>
+            <Input
+              id="new-device-name"
+              value={newDeviceName}
+              onChange={(e) => setNewDeviceName(e.target.value)}
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <Button type="submit" disabled={register.isPending}>
+              {register.isPending ? "Cadastrando..." : "Cadastrar e gerar link"}
+            </Button>
+          </div>
+        </form>
+
+        {lastRegistered && (
+          <div className="mt-5 grid gap-4 rounded-lg border border-primary/40 bg-primary/5 p-4 md:grid-cols-2">
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                1. Abra este link no celular ({lastRegistered.deviceName})
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                No próprio aparelho que vai ser acessado: dê o aceite, baixe e instale o app. A
+                situação muda para "ativo" aqui sozinha.
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  readOnly
+                  value={installLink(lastRegistered.enrollmentToken)}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="w-full truncate rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => copy(installLink(lastRegistered.enrollmentToken), "Link copiado.")}
+                >
+                  Copiar
+                </Button>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                2. Entregue o login a {lastRegistered.owner.name}
+              </p>
+              {lastRegistered.password ? (
+                <>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Anote agora: a senha só aparece nesta tela, uma vez.
+                  </p>
+                  <div className="mt-2 flex items-center gap-3">
+                    <p className="font-mono text-sm">
+                      código <strong>{lastRegistered.owner.loginCode}</strong> · senha{" "}
+                      <strong>{lastRegistered.password}</strong>
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        copy(
+                          `Código de acesso: ${lastRegistered.owner.loginCode}\nSenha: ${lastRegistered.password}`,
+                          "Login copiado.",
+                        )
+                      }
+                    >
+                      Copiar
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  O aparelho foi vinculado ao login que já existia (código{" "}
+                  <span className="font-mono">{lastRegistered.owner.loginCode}</span>). A senha
+                  continua a mesma.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-border bg-card p-6 md:col-span-2">
         <div className="mt-1 flex items-center gap-2">
           <h2 className="font-display text-base">Android Enterprise (Managed Google Play)</h2>
           {!enterpriseStatus.isLoading && !enterpriseStatus.data?.configured && (
@@ -165,8 +384,8 @@ function TiView({ data }: { data: Workspace }) {
           {!enterpriseStatus.isLoading && !enterpriseStatus.data?.configured && (
             <>
               {" "}
-              Enquanto isso não estiver configurado, cada profissional gera o próprio link de
-              ativação na própria tela e instala o app por ele.
+              Enquanto isso não estiver configurado, o app é instalado pelo link de ativação
+              gerado em "Cadastrar aparelho".
             </>
           )}
         </p>
@@ -212,8 +431,8 @@ function TiView({ data }: { data: Workspace }) {
       <section className="rounded-2xl border border-border bg-card p-6 md:col-span-2">
         <h2 className="font-display text-base">Aparelhos cadastrados</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Cada profissional gera o próprio link de ativação na própria tela - não precisa mais
-          cadastrar aqui antes. Esta lista é só pra acompanhar/revogar.
+          Todos os aparelhos cadastrados, com o profissional de cada um. Enquanto o aparelho
+          está pendente, o link de ativação pode ser copiado de novo aqui.
         </p>
         <ul className="mt-4 space-y-3">
           {data.devices.length === 0 && (
@@ -227,9 +446,40 @@ function TiView({ data }: { data: Workspace }) {
                   <p className="text-xs text-muted-foreground">
                     {d.model} · situação: {d.enrollment_status}
                   </p>
-                  <p className="text-xs text-muted-foreground">id {d.id.slice(0, 8)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(() => {
+                      const owner = d.owner_user_id ? ownersById.get(d.owner_user_id) : undefined;
+                      return owner
+                        ? `${owner.name} · código ${owner.login_code}`
+                        : "sem profissional vinculado";
+                    })()}{" "}
+                    · id {d.id.slice(0, 8)}
+                  </p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-2">
+                  {d.enrollment_status === "pendente" && d.enrollment_token && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copy(installLink(d.enrollment_token ?? ""), "Link copiado.")}
+                      >
+                        Copiar link de ativação
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          activateWithoutApp.mutate({
+                            data: { deviceId: d.id, enrollmentToken: d.enrollment_token ?? "" },
+                          })
+                        }
+                        disabled={activateWithoutApp.isPending}
+                      >
+                        Ativar sem o app (apenas teste)
+                      </Button>
+                    </>
+                  )}
                   {d.enrollment_status !== "revogado" && enterpriseStatus.data?.configured && (
                     <Button
                       variant="outline"
@@ -292,43 +542,15 @@ function ProfissionalView({ data }: { data: Workspace }) {
 
   // RLS já restringe "devices" ao próprio profissional (ou a tudo, se for TI
   // vendo via TiView) — aqui pegamos o aparelho independente do status, para
-  // conseguir mostrar o link de instalação enquanto ele ainda está "pendente".
+  // conseguir mostrar a situação dele mesmo enquanto ainda está "pendente".
   const primary = data.devices[0];
   const activeSession = data.sessions.find(
     (s) => s.status === "ativa" && s.device_id === primary?.id,
   );
-  const installUrl =
-    primary?.enrollment_token && typeof window !== "undefined"
-      ? `${window.location.origin}/instalar/${primary.enrollment_token}`
-      : "";
-
   const [reason, setReason] = useState(
     "Esqueci o celular em casa e preciso liberar um pagamento.",
   );
   const [mode, setMode] = useState<"visualizacao" | "controle">("controle");
-  const [deviceName, setDeviceName] = useState("Meu celular");
-
-  // Autoatendimento (decisão 05/10/2026, ver roadmap.md): a própria pessoa
-  // gera o link de ativação do próprio aparelho, sem precisar de TI nem de
-  // código de ninguém. Quem gera o link já fica dono - owner_user_id é
-  // sempre quem chamou createOwnDevice.
-  const createOwn = useMutation({
-    mutationFn: useServerFn(createOwnDevice),
-    onSuccess: () => {
-      toast.success("Link gerado. Abra-o no próprio celular que você quer acessar remotamente.");
-      invalidate();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const acceptSelf = useMutation({
-    mutationFn: useServerFn(acceptEnrollment),
-    onSuccess: () => {
-      toast.success("Aparelho ativado.");
-      invalidate();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
   const start = useMutation({
     mutationFn: useServerFn(startSession),
     onSuccess: () => {
@@ -346,102 +568,39 @@ function ProfissionalView({ data }: { data: Workspace }) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // Sem aparelho, ou com a gestão do aparelho mais recente revogada: nos dois
-  // casos a própria pessoa gera um novo link (autoatendimento, ver roadmap.md)
-  // - não depende do TI. O aparelho novo passa a ser o `primary` porque a
-  // lista vem do mais recente para o mais antigo.
-  if (!primary || primary.enrollment_status === "revogado") {
+  // O cadastro e a ativação do aparelho são feitos pelo TI antes da entrega
+  // (ver roadmap.md) - o profissional recebe o aparelho pronto e o login.
+  // Estas três telas só aparecem fora desse caminho normal.
+  if (!primary) {
     return (
       <div className="mx-auto max-w-md rounded-2xl border border-border bg-card p-8 text-center">
         <p className="text-muted-foreground">
-          {primary ? (
-            <>
-              A gestão do aparelho <strong>{primary.name}</strong> foi revogada. Se ainda precisar
-              de acesso remoto, gere um novo link de ativação e abra-o{" "}
-              <strong>no próprio celular</strong>.
-            </>
-          ) : (
-            <>
-              Você ainda não tem um celular vinculado. Gere o link de ativação e abra-o{" "}
-              <strong>no próprio celular</strong> que você quer poder acessar remotamente.
-            </>
-          )}
+          Ainda não há um celular vinculado ao seu login. O time de TI cadastra o aparelho e
+          entrega ele já pronto para o acesso remoto.
         </p>
-        <form
-          className="mt-6 space-y-3 text-left"
-          onSubmit={(e) => {
-            e.preventDefault();
-            createOwn.mutate({ data: { name: deviceName } });
-          }}
-        >
-          <div className="space-y-1">
-            <Label>Nome do aparelho</Label>
-            <Input value={deviceName} onChange={(e) => setDeviceName(e.target.value)} />
-          </div>
-          <Button type="submit" className="w-full" disabled={createOwn.isPending}>
-            {createOwn.isPending ? "Gerando..." : "Gerar link de ativação"}
-          </Button>
-        </form>
+      </div>
+    );
+  }
+
+  if (primary.enrollment_status === "revogado") {
+    return (
+      <div className="mx-auto max-w-md rounded-2xl border border-border bg-card p-8 text-center">
+        <p className="text-muted-foreground">
+          A gestão do aparelho <strong>{primary.name}</strong> foi revogada. Fale com o time de TI
+          se ainda precisar de acesso remoto.
+        </p>
       </div>
     );
   }
 
   if (primary.enrollment_status === "pendente") {
     return (
-      <div className="grid gap-6 md:grid-cols-[360px_1fr]">
-        <section className="rounded-2xl border border-border bg-card p-6">
-          <h2 className="font-display text-base">{primary.name}</h2>
-          <p className="text-sm text-muted-foreground">{primary.model} · aguardando ativação</p>
-
-          <div className="mt-6 rounded-lg border border-primary/40 bg-primary/5 p-4">
-            <p className="text-sm text-foreground">
-              Para poder acessar este celular remotamente, abra o link abaixo{" "}
-              <strong>no navegador do próprio aparelho</strong> — não neste computador — e siga o
-              passo a passo.
-            </p>
-            <div className="mt-3 flex items-center gap-2">
-              <input
-                readOnly
-                value={installUrl}
-                onFocus={(e) => e.currentTarget.select()}
-                className="w-full truncate rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs"
-              />
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  navigator.clipboard?.writeText(installUrl);
-                  toast.success("Link copiado.");
-                }}
-              >
-                Copiar
-              </Button>
-            </div>
-            <p className="mt-3 text-xs text-muted-foreground">
-              O link instala o app de gestão e ativa o aparelho. Depois de ativar no celular,
-              atualize esta página. Se não der para instalar o app agora, o botão abaixo conclui a
-              ativação só no painel, para teste — sem o app, a tela do celular não aparece aqui.
-            </p>
-            <Button
-              className="mt-3 w-full"
-              variant="outline"
-              onClick={() =>
-                acceptSelf.mutate({
-                  data: { deviceId: primary.id, enrollmentToken: primary.enrollment_token ?? "" },
-                })
-              }
-              disabled={acceptSelf.isPending || !primary.enrollment_token}
-            >
-              {acceptSelf.isPending ? "Ativando..." : "Ativar sem o app (apenas teste)"}
-            </Button>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-border bg-card p-6">
-          <h2 className="font-display text-base">Histórico de acessos</h2>
-          <AuditList items={data.audit.filter((a) => a.device_id === primary.id)} />
-        </section>
+      <div className="mx-auto max-w-md rounded-2xl border border-border bg-card p-8 text-center">
+        <h2 className="font-display text-base">{primary.name}</h2>
+        <p className="mt-2 text-muted-foreground">
+          Este aparelho ainda está aguardando ativação. Assim que o link enviado pelo TI for
+          aberto no celular e o app for instalado, o acesso remoto aparece aqui.
+        </p>
       </div>
     );
   }
@@ -781,6 +940,7 @@ function labelEvent(type: string) {
   const map: Record<string, string> = {
     conta_criada: "Conta criada",
     enrollment_iniciado: "Cadastro iniciado",
+    aceite_registrado: "Aceite registrado no celular",
     enrollment_concluido: "Aparelho ativado",
     gestao_revogada: "Gestão revogada",
     sessao_iniciada: "Sessão de acesso iniciada",

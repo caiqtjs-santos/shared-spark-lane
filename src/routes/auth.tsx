@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { finishSignup } from "@/lib/mdm.functions";
+import { createTiAccount } from "@/lib/mdm.functions";
 import { codeToEmail, isSixDigits, normalizeCode } from "@/lib/login-code";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,12 +30,11 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const completeSignup = useServerFn(finishSignup);
+  const createAccount = useServerFn(createTiAccount);
   const [mode, setMode] = useState<"entrar" | "criar">("entrar");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [role, setRole] = useState<"profissional" | "ti">("profissional");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -60,19 +59,15 @@ function AuthPage() {
         toast.error("Informe seu nome completo.");
         return;
       }
-      const { data, error } = await supabase.auth.signUp({
+      // A conta é criada pelo servidor (já confirmada) e só depois entramos
+      // com ela - ver createTiAccount para o porquê de não usar o cadastro
+      // comum pelo navegador.
+      await createAccount({ data: { loginCode: code, password, name: name.trim() } });
+      const signIn = await supabase.auth.signInWithPassword({
         email: codeToEmail(code),
         password,
       });
-      if (error) throw new Error("Não foi possível criar a conta. Tente outro código.");
-      if (!data.session) {
-        const signIn = await supabase.auth.signInWithPassword({
-          email: codeToEmail(code),
-          password,
-        });
-        if (signIn.error) throw new Error("Conta criada, mas o acesso falhou. Tente entrar.");
-      }
-      await completeSignup({ data: { loginCode: code, name: name.trim(), role } });
+      if (signIn.error) throw new Error("Conta criada, mas o acesso falhou. Tente entrar.");
       toast.success("Conta criada. Bem-vindo!");
       navigate({ to: "/painel" });
     } catch (err) {
@@ -91,10 +86,12 @@ function AuthPage() {
 
         <div className="rounded-2xl border border-border bg-card p-8 shadow-lg">
           <h1 className="font-display text-xl text-card-foreground">
-            {mode === "entrar" ? "Acessar o painel" : "Criar acesso"}
+            {mode === "entrar" ? "Acessar o painel" : "Criar acesso do time de TI"}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Use seu código de 6 dígitos e sua senha de 6 dígitos.
+            {mode === "entrar"
+              ? "Use seu código de 6 dígitos e sua senha de 6 dígitos."
+              : "Escolha um código e uma senha de 6 dígitos. Profissionais não se cadastram aqui: o login deles é criado pelo TI e entregue junto com o aparelho."}
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -138,28 +135,6 @@ function AuthPage() {
               />
             </div>
 
-            {mode === "criar" && (
-              <div className="space-y-2">
-                <Label>Tipo de acesso</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["profissional", "ti"] as const).map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      onClick={() => setRole(option)}
-                      className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
-                        role === option
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground hover:border-primary/40"
-                      }`}
-                    >
-                      {option === "profissional" ? "Profissional" : "Time de TI"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <Button type="submit" className="w-full" disabled={loading}>
               {loading
                 ? "Aguarde..."
@@ -175,7 +150,7 @@ function AuthPage() {
             className="mt-6 w-full text-sm text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
           >
             {mode === "entrar"
-              ? "Não tenho acesso ainda — criar agora"
+              ? "Sou do time de TI e ainda não tenho acesso — criar agora"
               : "Já tenho um código — entrar"}
           </button>
         </div>
