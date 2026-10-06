@@ -1,5 +1,6 @@
 package com.employeeexperience.meucelular
 
+import android.app.Activity
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -94,10 +95,16 @@ class ScreenCaptureService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(NOTIFICATION_ID, buildActiveSessionNotification())
 
-        val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, -1) ?: -1
+        // Activity.RESULT_OK vale -1: é exatamente o que o Android devolve
+        // quando a pessoa ACEITA o diálogo de captura de tela. Por isso o
+        // valor padrão (extra ausente) precisa ser RESULT_CANCELED, e a
+        // captura só começa quando o código é RESULT_OK - usar -1 como
+        // "ausente" fazia a captura nunca começar justamente no aceite.
+        val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
+            ?: Activity.RESULT_CANCELED
         val resultData = intent?.getParcelableExtra<Intent>(EXTRA_RESULT_DATA)
 
-        if (resultCode != -1 && resultData != null && mediaProjection == null) {
+        if (resultCode == Activity.RESULT_OK && resultData != null && mediaProjection == null) {
             startCapture(resultCode, resultData)
         }
 
