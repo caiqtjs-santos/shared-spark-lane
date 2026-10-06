@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/backend/client";
 import { useServerFn } from "@tanstack/react-start";
 import { createTiAccount } from "@/lib/mdm.functions";
 import { codeToEmail, isSixDigits, normalizeCode } from "@/lib/login-code";

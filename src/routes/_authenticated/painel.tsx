@@ -17,7 +17,7 @@ import {
   checkAndroidCredentials,
 } from "@/lib/enterprise.functions";
 import { getDeviceFrameUrl, sendDeviceInput } from "@/lib/screen.functions";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/backend/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,11 +55,39 @@ const workspaceQuery = (fn: ReturnType<typeof useServerFn<typeof getWorkspace>>)
 function PainelPage() {
   const navigate = useNavigate();
   const load = useServerFn(getWorkspace);
-  const { data, isLoading } = useQuery(workspaceQuery(load));
+  const { data, isLoading, error, refetch, isFetching } = useQuery(workspaceQuery(load));
 
   async function handleSignOut() {
     await supabase.auth.signOut();
     navigate({ to: "/auth" });
+  }
+
+  // Sem isto, qualquer falha do servidor ao carregar os dados deixava a tela
+  // presa em "Carregando painel..." para sempre, sem dizer o motivo.
+  if (error && !data) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="max-w-md rounded-2xl border border-border bg-card p-8 text-center">
+          <p className="font-display text-base text-card-foreground">
+            Não foi possível carregar o painel
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            O servidor respondeu com um erro. Tente de novo; se continuar, saia e entre outra vez.
+          </p>
+          <p className="mt-3 break-words rounded-md bg-muted/50 px-3 py-2 text-left font-mono text-xs text-muted-foreground">
+            {(error as Error).message || "Erro sem descrição."}
+          </p>
+          <div className="mt-4 flex justify-center gap-2">
+            <Button onClick={() => refetch()} disabled={isFetching}>
+              {isFetching ? "Tentando..." : "Tentar de novo"}
+            </Button>
+            <Button variant="outline" onClick={handleSignOut}>
+              Sair
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (isLoading || !data) {
