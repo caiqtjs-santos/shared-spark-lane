@@ -271,7 +271,17 @@ export const registerDevice = createServerFn({ method: "POST" })
       })
       .select("id")
       .single();
-    if (error) throw new Error(error.message);
+    if (error) {
+      // Se o login acabou de ser criado aqui e o aparelho não entrou, desfaz
+      // o login: a senha só seria mostrada no fim, então ele ficaria perdido.
+      if (password !== null) {
+        await db.from("audit_log").delete().eq("user_id", owner.id);
+        await db.from("user_roles").delete().eq("user_id", owner.id);
+        await db.from("profiles").delete().eq("id", owner.id);
+        await db.auth.admin.deleteUser(owner.id);
+      }
+      throw new Error(error.message);
+    }
 
     await logAudit(db, {
       event_type: "enrollment_iniciado",
