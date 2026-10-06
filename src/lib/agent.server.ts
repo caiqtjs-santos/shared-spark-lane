@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { supabaseAdmin } from "@/lib/backend/admin.server";
 
 export { supabaseAdmin };
 

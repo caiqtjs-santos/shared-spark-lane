@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireSupabaseAuth } from "@/lib/backend/auth-middleware";
 import { z } from "zod";
 import {
   createSignupUrl,
@@ -19,7 +19,7 @@ function parseInput<T extends z.ZodTypeAny>(schema: T, input: unknown): z.infer<
 }
 
 async function admin() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { supabaseAdmin } = await import("@/lib/backend/admin.server");
   return supabaseAdmin;
 }
 
