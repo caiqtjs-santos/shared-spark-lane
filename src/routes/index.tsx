@@ -59,8 +59,8 @@ function Home() {
       <section className="mx-auto grid max-w-5xl gap-4 px-4 pb-20 sm:grid-cols-3">
         {[
           {
-            t: "Cadastro em um aceite",
-            d: "O TI cadastra o aparelho e o profissional confirma no celular. Fim.",
+            t: "Cadastro por conta própria",
+            d: "O profissional gera o link de ativação no painel e abre no próprio celular. Sem depender do TI.",
           },
           {
             t: "Acesso sob demanda",

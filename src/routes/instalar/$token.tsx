@@ -85,7 +85,7 @@ function InstalarPage() {
             <div className="text-center">
               <p className="text-sm text-destructive">{(error as Error).message}</p>
               <p className="mt-2 text-xs text-muted-foreground">
-                Peça ao TI um novo link de ativação.
+                Entre no painel e gere um novo link de ativação.
               </p>
             </div>
           )}

@@ -165,8 +165,8 @@ function TiView({ data }: { data: Workspace }) {
           {!enterpriseStatus.isLoading && !enterpriseStatus.data?.configured && (
             <>
               {" "}
-              Enquanto isso não estiver configurado, cada profissional gera e ativa o próprio
-              link manualmente (modo de teste) na própria tela.
+              Enquanto isso não estiver configurado, cada profissional gera o próprio link de
+              ativação na própria tela e instala o app por ele.
             </>
           )}
         </p>
@@ -346,12 +346,26 @@ function ProfissionalView({ data }: { data: Workspace }) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (!primary) {
+  // Sem aparelho, ou com a gestão do aparelho mais recente revogada: nos dois
+  // casos a própria pessoa gera um novo link (autoatendimento, ver roadmap.md)
+  // - não depende do TI. O aparelho novo passa a ser o `primary` porque a
+  // lista vem do mais recente para o mais antigo.
+  if (!primary || primary.enrollment_status === "revogado") {
     return (
       <div className="mx-auto max-w-md rounded-2xl border border-border bg-card p-8 text-center">
         <p className="text-muted-foreground">
-          Você ainda não tem um celular vinculado. Gere o link de ativação e abra-o{" "}
-          <strong>no próprio celular</strong> que você quer poder acessar remotamente.
+          {primary ? (
+            <>
+              A gestão do aparelho <strong>{primary.name}</strong> foi revogada. Se ainda precisar
+              de acesso remoto, gere um novo link de ativação e abra-o{" "}
+              <strong>no próprio celular</strong>.
+            </>
+          ) : (
+            <>
+              Você ainda não tem um celular vinculado. Gere o link de ativação e abra-o{" "}
+              <strong>no próprio celular</strong> que você quer poder acessar remotamente.
+            </>
+          )}
         </p>
         <form
           className="mt-6 space-y-3 text-left"
@@ -368,17 +382,6 @@ function ProfissionalView({ data }: { data: Workspace }) {
             {createOwn.isPending ? "Gerando..." : "Gerar link de ativação"}
           </Button>
         </form>
-      </div>
-    );
-  }
-
-  if (primary.enrollment_status === "revogado") {
-    return (
-      <div className="rounded-2xl border border-border bg-card p-8 text-center">
-        <p className="text-muted-foreground">
-          A gestão do aparelho <strong>{primary.name}</strong> foi revogada pelo TI. Peça um novo
-          cadastro se ainda precisar de acesso remoto.
-        </p>
       </div>
     );
   }
@@ -416,9 +419,9 @@ function ProfissionalView({ data }: { data: Workspace }) {
               </Button>
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
-              O app de gestão que esse link instala ainda está em desenvolvimento. Enquanto isso,
-              use o botão abaixo para concluir a ativação manualmente (útil para testar sem
-              esperar o instalador real do celular).
+              O link instala o app de gestão e ativa o aparelho. Depois de ativar no celular,
+              atualize esta página. Se não der para instalar o app agora, o botão abaixo conclui a
+              ativação só no painel, para teste — sem o app, a tela do celular não aparece aqui.
             </p>
             <Button
               className="mt-3 w-full"
@@ -430,7 +433,7 @@ function ProfissionalView({ data }: { data: Workspace }) {
               }
               disabled={acceptSelf.isPending || !primary.enrollment_token}
             >
-              {acceptSelf.isPending ? "Ativando..." : "Concluir ativação manualmente (teste)"}
+              {acceptSelf.isPending ? "Ativando..." : "Ativar sem o app (apenas teste)"}
             </Button>
           </div>
         </section>
