@@ -440,7 +440,7 @@ function TiView({ data }: { data: Workspace }) {
           )}
           {data.devices.map((d) => (
             <li key={d.id} className="rounded-lg border border-border p-3">
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="font-medium">{d.name}</p>
                   <p className="text-xs text-muted-foreground">
@@ -456,7 +456,7 @@ function TiView({ data }: { data: Workspace }) {
                     · id {d.id.slice(0, 8)}
                   </p>
                 </div>
-                <div className="flex shrink-0 flex-col items-end gap-2">
+                <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
                   {d.enrollment_status === "pendente" && d.enrollment_token && (
                     <>
                       <Button
