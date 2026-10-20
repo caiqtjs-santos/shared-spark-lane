@@ -1,5 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
 import { BACKEND_URL, createBackendFetch } from "./config";
 
 /** Nome do segredo (Lovable → More → Cloud → Secrets) com a chave secreta do banco. */
@@ -19,6 +18,10 @@ const SERVICE_ROLE_SECRET_NAME = "MEUCELULAR_SERVICE_ROLE_KEY";
  * Carregue dentro dos handlers:
  *   const { supabaseAdmin } = await import("@/lib/backend/admin.server");
  */
+// Sem tipos gerados de propósito: src/integrations/supabase/types.ts é gerado a
+// partir do banco do Lovable Cloud, que não tem as tabelas/colunas do banco
+// próprio (session_inputs, device_commands, devices.screen_width...). Tipar
+// por ele só gera erros falsos de compilação.
 function createAdminClient() {
   const serviceRoleKey = process.env[SERVICE_ROLE_SECRET_NAME]?.trim();
 
@@ -31,7 +34,7 @@ function createAdminClient() {
     throw new Error(message);
   }
 
-  return createClient<Database>(BACKEND_URL, serviceRoleKey, {
+  return createClient(BACKEND_URL, serviceRoleKey, {
     global: {
       fetch: createBackendFetch(serviceRoleKey),
     },
