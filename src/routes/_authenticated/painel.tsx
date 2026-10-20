@@ -17,6 +17,18 @@ import {
   checkAndroidCredentials,
 } from "@/lib/enterprise.functions";
 import { getDeviceFrameUrl, sendDeviceInput } from "@/lib/screen.functions";
+import { issueDeviceCommand } from "@/lib/device-commands.functions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/lib/backend/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -526,6 +538,9 @@ function TiView({ data }: { data: Workspace }) {
                       Gerar QR de provisionamento
                     </Button>
                   )}
+                  {d.enrollment_status === "ativo" && (
+                    <DeviceCommandButtons deviceId={d.id} deviceName={d.name} />
+                  )}
                   {d.enrollment_status !== "revogado" && (
                     <Button
                       variant="outline"
@@ -973,6 +988,80 @@ function labelEvent(type: string) {
     gestao_revogada: "Gestão revogada",
     sessao_iniciada: "Sessão de acesso iniciada",
     sessao_encerrada: "Sessão encerrada",
+    comando_enviado: "Comando enviado ao aparelho",
+    comando_entregue: "Comando recebido pelo aparelho",
   };
   return map[type] ?? type;
+}
+
+/**
+ * Comandos remotos do TI (ver device-commands.functions.ts). O aparelho busca
+ * o comando em até ~15s (polling) e o executa localmente como Device Owner.
+ * "Apagar" é irreversível, por isso só segue depois do diálogo de confirmação.
+ */
+function DeviceCommandButtons({ deviceId, deviceName }: { deviceId: string; deviceName: string }) {
+  const qc = useQueryClient();
+  const issue = useServerFn(issueDeviceCommand);
+  const send = useMutation({
+    mutationFn: (vars: { deviceId: string; kind: "lock" | "reboot" | "wipe"; confirmWipe?: boolean }) =>
+      issue({ data: vars }),
+    onSuccess: (_res, { kind }) => {
+      toast.success(
+        kind === "lock"
+          ? "Comando enviado: o aparelho vai bloquear a tela em instantes."
+          : kind === "reboot"
+            ? "Comando enviado: o aparelho vai reiniciar em instantes."
+            : "Comando enviado: o aparelho vai ser apagado em instantes.",
+      );
+      qc.invalidateQueries({ queryKey: ["workspace"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="flex flex-wrap gap-2 sm:justify-end">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={send.isPending}
+        onClick={() => send.mutate({ deviceId, kind: "lock" })}
+      >
+        Bloquear tela
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={send.isPending}
+        onClick={() => send.mutate({ deviceId, kind: "reboot" })}
+      >
+        Reiniciar
+      </Button>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button variant="destructive" size="sm" disabled={send.isPending}>
+            Apagar aparelho
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apagar o aparelho "{deviceName}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso apaga TODOS os dados do celular e o devolve ao estado de fábrica. Não tem
+              volta: fotos, apps e arquivos que não estiverem em outro lugar serão perdidos, e
+              o aparelho precisará ser cadastrado de novo. O comando é executado assim que o
+              aparelho estiver ligado e com internet.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => send.mutate({ deviceId, kind: "wipe", confirmWipe: true })}
+            >
+              Sim, apagar tudo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
 }

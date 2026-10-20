@@ -14,6 +14,8 @@
   - As contas passam a ser criadas pelo servidor, já confirmadas (API de administração do Supabase), porque o login usa um e-mail interno fictício (`<código>@meucelular.local`) que o projeto novo recusa no cadastro comum ("Email address ... is invalid"). Depende de `SUPABASE_SERVICE_ROLE_KEY` estar configurada.
   - Continua em aberto (item "Revisar login/2FA"): qualquer pessoa que abra /auth consegue criar uma conta de TI, e ainda não existe redefinição de senha.
 
+- DECISÃO (19/10/2026): comandos remotos de aparelho (bloquear tela / reiniciar / apagar) via **Device Owner**, não via Android Management API (que ainda nem está configurada). O app já é Device Owner e chama `DevicePolicyManager.lockNow()` / `reboot()` / `wipeData(0)` localmente; o painel só grava uma linha em `device_commands` e o app busca por polling em `/api/public/agent/commands` (mesmo padrão de `session_inputs` / "zero dependência nova" do espelhamento sem WebRTC). Só o TI envia (ações administrativas/destrutivas); TI e dono do aparelho leem. Apagar exige diálogo de confirmação no painel E `confirmWipe` no servidor. Auditoria: `comando_enviado` e `comando_entregue`. A migration `20261020010500_device_commands.sql` está só no arquivo — falta aplicar no banco.
+
 ## Bloqueando agora
 - [ ] **Banco novo (brazmbstdzinxgdydxlk) criado e com as migrations aplicadas, mas ainda não é o banco em uso de verdade:**
   - [ ] **Único passo que falta, e só o dono da conta consegue fazer:** pegar a chave secreta do projeto em supabase.com/dashboard/project/brazmbstdzinxgdydxlk/settings/api-keys ("Secret keys", começa com `sb_secret_`; a `service_role` antiga também serve) e cadastrar no Lovable em More → Cloud → Secrets → Add secret, com o nome **`MEUCELULAR_SERVICE_ROLE_KEY`**. Sem ela o painel abre, mas cadastrar aparelho, iniciar sessão e o app do celular respondem com erro.
@@ -45,6 +47,7 @@
 ## A função central
 - [x] Ver a tela do celular — implementado SEM WebRTC (ver decisão 05/10/2026): MediaProjection → JPEG → upload pro backend → painel busca em polling. Código escrito e revisado, mas **nunca testado num aparelho físico** (ScreenCaptureService.kt).
 - [x] Controlar a tela — toque/arraste no painel vira linha em `session_inputs`, o app consome via polling e injeta via RemoteAccessibilityService. Também não testado em hardware real.
+- [x] Comandos remotos (bloquear tela / reiniciar / apagar) — implementado (painel do TI, server function, rota do agente, `DeviceCommandExecutor.kt` no loop do `SessionWatcherService`, `<wipe-data />` na política). **NÃO testado em hardware físico**, só revisado contra a documentação do Android — mesmo status dos itens de MediaProjection/AccessibilityService. Falta aplicar a migration no banco.
 - [ ] Testar os dois itens acima em um Android de verdade e ajustar o que aparecer (stride de imagem, tempo de resposta do createVirtualDisplay, FRAME_INTERVAL_MS/JPEG_QUALITY).
 
 ## Depois

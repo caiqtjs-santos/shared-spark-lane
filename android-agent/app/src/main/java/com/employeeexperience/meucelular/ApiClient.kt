@@ -174,6 +174,28 @@ class ApiClient(private val baseUrl: String = BASE_URL) {
         }
     }
 
+    /**
+     * Comandos administrativos pendentes (lock/reboot/wipe) mandados pelo TI -
+     * ver src/routes/api/public/agent/commands.ts. Cada chamada já marca como
+     * entregues os itens retornados: quem chama deve executar na hora.
+     */
+    @Throws(IOException::class, ApiException::class)
+    fun fetchPendingCommands(deviceId: String, deviceSecret: String): List<String> {
+        val request = Request.Builder()
+            .url("$baseUrl/api/public/agent/commands")
+            .header("x-device-id", deviceId)
+            .header("x-device-secret", deviceSecret)
+            .get()
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val json = JSONObject(response.body?.string() ?: "{}")
+            if (!response.isSuccessful) throw ApiException(json.optString("error", "Falha ao consultar comandos (${response.code})"))
+            val arr = json.optJSONArray("commands") ?: return emptyList()
+            return (0 until arr.length()).map { i -> arr.getJSONObject(i).getString("kind") }
+        }
+    }
+
     data class EnrollResult(val deviceId: String, val deviceSecret: String)
     data class ActiveSession(val id: String, val mode: String, val reason: String, val startedAt: String)
     data class PendingInput(

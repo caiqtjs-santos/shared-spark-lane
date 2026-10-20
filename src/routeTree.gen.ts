@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated/painel'
 import { Route as InstalarTokenRouteImport } from './routes/instalar/$token'
 import { Route as AuthenticatedTiEnterpriseCallbackRouteImport } from './routes/_authenticated/ti/enterprise-callback'
+import { Route as ApiPublicAgentCommandsRouteImport } from './routes/api/public/agent/commands'
 import { Route as ApiPublicAgentDeviceInfoRouteImport } from './routes/api/public/agent/device-info'
 import { Route as ApiPublicAgentEnrollRouteImport } from './routes/api/public/agent/enroll'
 import { Route as ApiPublicAgentFrameRouteImport } from './routes/api/public/agent/frame'
@@ -52,6 +53,11 @@ const AuthenticatedTiEnterpriseCallbackRoute =
     path: '/ti/enterprise-callback',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicAgentCommandsRoute = ApiPublicAgentCommandsRouteImport.update({
+  id: '/api/public/agent/commands',
+  path: '/api/public/agent/commands',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicAgentDeviceInfoRoute =
   ApiPublicAgentDeviceInfoRouteImport.update({
     id: '/api/public/agent/device-info',
@@ -90,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/painel': typeof AuthenticatedPainelRoute
   '/instalar/$token': typeof InstalarTokenRoute
   '/ti/enterprise-callback': typeof AuthenticatedTiEnterpriseCallbackRoute
+  '/api/public/agent/commands': typeof ApiPublicAgentCommandsRoute
   '/api/public/agent/device-info': typeof ApiPublicAgentDeviceInfoRoute
   '/api/public/agent/enroll': typeof ApiPublicAgentEnrollRoute
   '/api/public/agent/frame': typeof ApiPublicAgentFrameRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/painel': typeof AuthenticatedPainelRoute
   '/instalar/$token': typeof InstalarTokenRoute
   '/ti/enterprise-callback': typeof AuthenticatedTiEnterpriseCallbackRoute
+  '/api/public/agent/commands': typeof ApiPublicAgentCommandsRoute
   '/api/public/agent/device-info': typeof ApiPublicAgentDeviceInfoRoute
   '/api/public/agent/enroll': typeof ApiPublicAgentEnrollRoute
   '/api/public/agent/frame': typeof ApiPublicAgentFrameRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/_authenticated/painel': typeof AuthenticatedPainelRoute
   '/instalar/$token': typeof InstalarTokenRoute
   '/_authenticated/ti/enterprise-callback': typeof AuthenticatedTiEnterpriseCallbackRoute
+  '/api/public/agent/commands': typeof ApiPublicAgentCommandsRoute
   '/api/public/agent/device-info': typeof ApiPublicAgentDeviceInfoRoute
   '/api/public/agent/enroll': typeof ApiPublicAgentEnrollRoute
   '/api/public/agent/frame': typeof ApiPublicAgentFrameRoute
@@ -133,6 +142,7 @@ export interface FileRouteTypes {
     | '/painel'
     | '/instalar/$token'
     | '/ti/enterprise-callback'
+    | '/api/public/agent/commands'
     | '/api/public/agent/device-info'
     | '/api/public/agent/enroll'
     | '/api/public/agent/frame'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/painel'
     | '/instalar/$token'
     | '/ti/enterprise-callback'
+    | '/api/public/agent/commands'
     | '/api/public/agent/device-info'
     | '/api/public/agent/enroll'
     | '/api/public/agent/frame'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/_authenticated/painel'
     | '/instalar/$token'
     | '/_authenticated/ti/enterprise-callback'
+    | '/api/public/agent/commands'
     | '/api/public/agent/device-info'
     | '/api/public/agent/enroll'
     | '/api/public/agent/frame'
@@ -173,6 +185,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   InstalarTokenRoute: typeof InstalarTokenRoute
+  ApiPublicAgentCommandsRoute: typeof ApiPublicAgentCommandsRoute
   ApiPublicAgentDeviceInfoRoute: typeof ApiPublicAgentDeviceInfoRoute
   ApiPublicAgentEnrollRoute: typeof ApiPublicAgentEnrollRoute
   ApiPublicAgentFrameRoute: typeof ApiPublicAgentFrameRoute
@@ -224,6 +237,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/ti/enterprise-callback'
       preLoaderRoute: typeof AuthenticatedTiEnterpriseCallbackRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/public/agent/commands': {
+      id: '/api/public/agent/commands'
+      path: '/api/public/agent/commands'
+      fullPath: '/api/public/agent/commands'
+      preLoaderRoute: typeof ApiPublicAgentCommandsRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/agent/device-info': {
       id: '/api/public/agent/device-info'
@@ -289,6 +309,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   InstalarTokenRoute: InstalarTokenRoute,
+  ApiPublicAgentCommandsRoute: ApiPublicAgentCommandsRoute,
   ApiPublicAgentDeviceInfoRoute: ApiPublicAgentDeviceInfoRoute,
   ApiPublicAgentEnrollRoute: ApiPublicAgentEnrollRoute,
   ApiPublicAgentFrameRoute: ApiPublicAgentFrameRoute,

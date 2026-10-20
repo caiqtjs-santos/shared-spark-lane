@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -120,8 +120,6 @@ export type Database = {
           name: string
           owner_user_id: string | null
           push_token: string | null
-          screen_height: number | null
-          screen_width: number | null
         }
         Insert: {
           android_enrollment_expires_at?: string | null
@@ -142,8 +140,6 @@ export type Database = {
           name: string
           owner_user_id?: string | null
           push_token?: string | null
-          screen_height?: number | null
-          screen_width?: number | null
         }
         Update: {
           android_enrollment_expires_at?: string | null
@@ -164,67 +160,8 @@ export type Database = {
           name?: string
           owner_user_id?: string | null
           push_token?: string | null
-          screen_height?: number | null
-          screen_width?: number | null
         }
         Relationships: []
-      }
-      session_inputs: {
-        Row: {
-          created_at: string
-          delivered_at: string | null
-          device_id: string
-          duration_ms: number | null
-          id: string
-          kind: string
-          session_id: string
-          x: number
-          x2: number | null
-          y: number
-          y2: number | null
-        }
-        Insert: {
-          created_at?: string
-          delivered_at?: string | null
-          device_id: string
-          duration_ms?: number | null
-          id?: string
-          kind: string
-          session_id: string
-          x: number
-          x2?: number | null
-          y: number
-          y2?: number | null
-        }
-        Update: {
-          created_at?: string
-          delivered_at?: string | null
-          device_id?: string
-          duration_ms?: number | null
-          id?: string
-          kind?: string
-          session_id?: string
-          x?: number
-          x2?: number | null
-          y?: number
-          y2?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "session_inputs_device_id_fkey"
-            columns: ["device_id"]
-            isOneToOne: false
-            referencedRelation: "devices"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "session_inputs_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "access_sessions"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       enterprise_config: {
         Row: {
