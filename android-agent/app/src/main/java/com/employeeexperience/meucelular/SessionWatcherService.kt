@@ -42,11 +42,13 @@ class SessionWatcherService : Service() {
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private lateinit var deviceStore: DeviceStore
     private val apiClient = ApiClient()
+    private lateinit var commandExecutor: DeviceCommandExecutor
     private var lastSessionActive = false
 
     override fun onCreate() {
         super.onCreate()
         deviceStore = DeviceStore(this)
+        commandExecutor = DeviceCommandExecutor(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -79,6 +81,16 @@ class SessionWatcherService : Service() {
                 // Rede instável é esperado (celular fora do wifi, sem sinal
                 // momentaneamente) - não derruba o serviço, só tenta de novo
                 // no próximo ciclo.
+            }
+
+            // Comandos do TI (bloquear/reiniciar/apagar) em bloco próprio: rodam
+            // com ou sem sessão ativa (aparelho perdido = sem sessão aberta) e
+            // uma falha acima não impede de buscá-los.
+            try {
+                val commands = apiClient.fetchPendingCommands(deviceId, deviceSecret)
+                for (kind in commands) commandExecutor.execute(kind)
+            } catch (e: Exception) {
+                // Mesmo tratamento: tenta de novo no próximo ciclo.
             }
 
             delay(POLL_INTERVAL_MS)

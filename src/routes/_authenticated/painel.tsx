@@ -973,6 +973,8 @@ function labelEvent(type: string) {
     gestao_revogada: "Gestão revogada",
     sessao_iniciada: "Sessão de acesso iniciada",
     sessao_encerrada: "Sessão encerrada",
+    comando_enviado: "Comando enviado ao aparelho",
+    comando_entregue: "Comando recebido pelo aparelho",
   };
   return map[type] ?? type;
 }
