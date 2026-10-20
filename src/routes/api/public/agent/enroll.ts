@@ -4,6 +4,12 @@ import { z } from "zod";
 /**
  * O app Android troca o token de ativação por um segredo permanente do
  * aparelho. Corresponde ao "único aceite" do onboarding.
+ *
+ * O token NÃO é apagado aqui: depois da ativação ele continua sendo o link
+ * permanente do profissional (/instalar/<token> abre o painel de acesso
+ * remoto - decisão de 20/10/2026). Para esse link não virar uma forma de
+ * roubar o aparelho, a troca por device_secret só vale UMA vez: com o
+ * aparelho já ativo, um novo enrollment é recusado.
  */
 export const Route = createFileRoute("/api/public/agent/enroll")({
   server: {
@@ -41,6 +47,8 @@ export const Route = createFileRoute("/api/public/agent/enroll")({
         if (!device) return json({ error: "Token de ativação inválido" }, 404);
         if (device.enrollment_status === "revogado")
           return json({ error: "Aparelho revogado" }, 403);
+        if (device.enrollment_status !== "pendente")
+          return json({ error: "Este aparelho já foi ativado" }, 409);
 
         const deviceSecret = `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, "");
 
@@ -50,7 +58,6 @@ export const Route = createFileRoute("/api/public/agent/enroll")({
             enrollment_status: "ativo",
             enrolled_at: new Date().toISOString(),
             device_secret: deviceSecret,
-            enrollment_token: null,
             last_seen_at: new Date().toISOString(),
             ...(parsed.data.model ? { model: parsed.data.model } : {}),
             ...(parsed.data.pushToken ? { push_token: parsed.data.pushToken } : {}),
