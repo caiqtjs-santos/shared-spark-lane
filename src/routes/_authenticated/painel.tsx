@@ -993,3 +993,74 @@ function labelEvent(type: string) {
   };
   return map[type] ?? type;
 }
+
+/**
+ * Comandos remotos do TI (ver device-commands.functions.ts). O aparelho busca
+ * o comando em até ~15s (polling) e o executa localmente como Device Owner.
+ * "Apagar" é irreversível, por isso só segue depois do diálogo de confirmação.
+ */
+function DeviceCommandButtons({ deviceId, deviceName }: { deviceId: string; deviceName: string }) {
+  const qc = useQueryClient();
+  const send = useMutation({
+    mutationFn: useServerFn(issueDeviceCommand),
+    onSuccess: (_res, vars) => {
+      const kind = (vars as { data: { kind: "lock" | "reboot" | "wipe" } }).data.kind;
+      toast.success(
+        kind === "lock"
+          ? "Comando enviado: o aparelho vai bloquear a tela em instantes."
+          : kind === "reboot"
+            ? "Comando enviado: o aparelho vai reiniciar em instantes."
+            : "Comando enviado: o aparelho vai ser apagado em instantes.",
+      );
+      qc.invalidateQueries({ queryKey: ["workspace"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="flex flex-wrap gap-2 sm:justify-end">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={send.isPending}
+        onClick={() => send.mutate({ data: { deviceId, kind: "lock" } })}
+      >
+        Bloquear tela
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={send.isPending}
+        onClick={() => send.mutate({ data: { deviceId, kind: "reboot" } })}
+      >
+        Reiniciar
+      </Button>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button variant="destructive" size="sm" disabled={send.isPending}>
+            Apagar aparelho
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apagar o aparelho "{deviceName}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso apaga TODOS os dados do celular e o devolve ao estado de fábrica. Não tem
+              volta: fotos, apps e arquivos que não estiverem em outro lugar serão perdidos, e
+              o aparelho precisará ser cadastrado de novo. O comando é executado assim que o
+              aparelho estiver ligado e com internet.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => send.mutate({ data: { deviceId, kind: "wipe", confirmWipe: true } })}
+            >
+              Sim, apagar tudo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
