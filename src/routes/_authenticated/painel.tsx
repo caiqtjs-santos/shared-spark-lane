@@ -17,6 +17,18 @@ import {
   checkAndroidCredentials,
 } from "@/lib/enterprise.functions";
 import { getDeviceFrameUrl, sendDeviceInput } from "@/lib/screen.functions";
+import { issueDeviceCommand } from "@/lib/device-commands.functions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/lib/backend/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -525,6 +537,9 @@ function TiView({ data }: { data: Workspace }) {
                     >
                       Gerar QR de provisionamento
                     </Button>
+                  )}
+                  {d.enrollment_status === "ativo" && (
+                    <DeviceCommandButtons deviceId={d.id} deviceName={d.name} />
                   )}
                   {d.enrollment_status !== "revogado" && (
                     <Button
