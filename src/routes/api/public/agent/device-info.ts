@@ -21,7 +21,7 @@ export const Route = createFileRoute("/api/public/agent/device-info")({
 
         const { data: device } = await supabaseAdmin
           .from("devices")
-          .select("name, model, enrollment_status")
+          .select("name, model, professional_name, enrollment_status")
           .eq("enrollment_token", parsed.data.token)
           .maybeSingle();
 
@@ -32,6 +32,7 @@ export const Route = createFileRoute("/api/public/agent/device-info")({
         return json({
           name: device.name,
           model: device.model,
+          professionalName: device.professional_name,
           status: device.enrollment_status,
         });
       },
