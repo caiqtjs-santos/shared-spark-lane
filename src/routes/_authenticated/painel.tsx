@@ -1001,10 +1001,11 @@ function labelEvent(type: string) {
  */
 function DeviceCommandButtons({ deviceId, deviceName }: { deviceId: string; deviceName: string }) {
   const qc = useQueryClient();
+  const issue = useServerFn(issueDeviceCommand);
   const send = useMutation({
-    mutationFn: useServerFn(issueDeviceCommand),
-    onSuccess: (_res, vars) => {
-      const kind = (vars as { data: { kind: "lock" | "reboot" | "wipe" } }).data.kind;
+    mutationFn: (vars: { deviceId: string; kind: "lock" | "reboot" | "wipe"; confirmWipe?: boolean }) =>
+      issue({ data: vars }),
+    onSuccess: (_res, { kind }) => {
       toast.success(
         kind === "lock"
           ? "Comando enviado: o aparelho vai bloquear a tela em instantes."
@@ -1023,7 +1024,7 @@ function DeviceCommandButtons({ deviceId, deviceName }: { deviceId: string; devi
         variant="outline"
         size="sm"
         disabled={send.isPending}
-        onClick={() => send.mutate({ data: { deviceId, kind: "lock" } })}
+        onClick={() => send.mutate({ deviceId, kind: "lock" })}
       >
         Bloquear tela
       </Button>
@@ -1031,7 +1032,7 @@ function DeviceCommandButtons({ deviceId, deviceName }: { deviceId: string; devi
         variant="outline"
         size="sm"
         disabled={send.isPending}
-        onClick={() => send.mutate({ data: { deviceId, kind: "reboot" } })}
+        onClick={() => send.mutate({ deviceId, kind: "reboot" })}
       >
         Reiniciar
       </Button>
@@ -1054,7 +1055,7 @@ function DeviceCommandButtons({ deviceId, deviceName }: { deviceId: string; devi
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => send.mutate({ data: { deviceId, kind: "wipe", confirmWipe: true } })}
+              onClick={() => send.mutate({ deviceId, kind: "wipe", confirmWipe: true })}
             >
               Sim, apagar tudo
             </AlertDialogAction>
