@@ -86,12 +86,12 @@ function AuthPage() {
 
         <div className="rounded-2xl border border-border bg-card p-8 shadow-lg">
           <h1 className="font-display text-xl text-card-foreground">
-            {mode === "entrar" ? "Acessar o painel" : "Criar acesso do time de TI"}
+            {mode === "entrar" ? "Acesso do time de TI" : "Criar acesso do time de TI"}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {mode === "entrar"
-              ? "Use seu código de 6 dígitos e sua senha de 6 dígitos."
-              : "Escolha um código e uma senha de 6 dígitos. Profissionais não se cadastram aqui: o login deles é criado pelo TI e entregue junto com o aparelho."}
+              ? "Use seu código de 6 dígitos e sua senha de 6 dígitos. Este login é só para o time de TI."
+              : "Escolha um código e uma senha de 6 dígitos. Profissionais não têm login: eles só usam o link do aparelho que o TI gera e entrega."}
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">

@@ -21,7 +21,7 @@ export type Database = {
           id: string
           mode: string
           reason: string
-          requested_by_user_id: string
+          requested_by_user_id: string | null
           started_at: string
           status: string
         }
@@ -31,7 +31,7 @@ export type Database = {
           id?: string
           mode: string
           reason: string
-          requested_by_user_id: string
+          requested_by_user_id?: string | null
           started_at?: string
           status?: string
         }
@@ -41,7 +41,7 @@ export type Database = {
           id?: string
           mode?: string
           reason?: string
-          requested_by_user_id?: string
+          requested_by_user_id?: string | null
           started_at?: string
           status?: string
         }
@@ -119,6 +119,7 @@ export type Database = {
           model: string
           name: string
           owner_user_id: string | null
+          professional_name: string | null
           push_token: string | null
         }
         Insert: {
@@ -139,6 +140,7 @@ export type Database = {
           model: string
           name: string
           owner_user_id?: string | null
+          professional_name?: string | null
           push_token?: string | null
         }
         Update: {
@@ -159,6 +161,7 @@ export type Database = {
           model?: string
           name?: string
           owner_user_id?: string | null
+          professional_name?: string | null
           push_token?: string | null
         }
         Relationships: []
