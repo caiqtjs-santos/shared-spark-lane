@@ -1,5 +1,8 @@
 package com.employeeexperience.meucelular
 
+import android.app.Activity
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import android.os.Build
@@ -46,6 +49,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonActivate: Button
     private lateinit var textSessionStatus: TextView
     private lateinit var buttonDeactivate: Button
+
+    // Token guardado enquanto aguarda o resultado da tela nativa de "virar
+    // dono do aparelho" (ver requestDeviceOwnerProvisioning) - o ativar só
+    // continua depois que essa tela volta com sucesso.
+    private var pendingEnrollToken: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -142,6 +150,59 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        // Sem isto, o Android bloqueia a permissão de Acessibilidade mais
+        // adiante ("Configurações restritas" do Android 13+, exigida para
+        // qualquer app instalado por fora da Play Store). Virar "dono do
+        // aparelho" tira o app dessa categoria - ver
+        // requestDeviceOwnerProvisioning() e DeviceOwnerReceiver. Só é
+        // possível enquanto o aparelho não tem nenhuma conta configurada,
+        // por isso precisa acontecer logo no primeiro toque em "Ativar",
+        // antes de qualquer outra coisa.
+        if (!isDeviceOwner()) {
+            pendingEnrollToken = token
+            buttonActivate.isEnabled = false
+            buttonActivate.text = "Confirmando gestão do aparelho..."
+            requestDeviceOwnerProvisioning()
+            return
+        }
+
+        proceedToEnroll(token)
+    }
+
+    private fun isDeviceOwner(): Boolean {
+        val dpm = getSystemService(DevicePolicyManager::class.java)
+        return dpm?.isDeviceOwnerApp(packageName) == true
+    }
+
+    /**
+     * Abre a tela nativa do Android perguntando se este app pode gerenciar
+     * o aparelho - é a MESMA tela que aparece hoje no fluxo por QR code
+     * (Android Enterprise), só que disparada pelo próprio app já instalado,
+     * em vez de durante o assistente de configuração inicial. Documentado
+     * pelo próprio Android: https://developer.android.com/work/dpc/build-dpc
+     * ("ACTION_PROVISION_MANAGED_DEVICE... if your app is already installed
+     * on the device"). Só funciona em aparelho sem nenhuma conta
+     * configurada ainda (o mesmo requisito que já vale pro QR).
+     */
+    private fun requestDeviceOwnerProvisioning() {
+        val intent = Intent(DevicePolicyManager.ACTION_PROVISION_MANAGED_DEVICE).apply {
+            putExtra(
+                DevicePolicyManager.EXTRA_PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME,
+                ComponentName(this@MainActivity, DeviceOwnerReceiver::class.java),
+            )
+        }
+        if (intent.resolveActivity(packageManager) != null) {
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, REQUEST_CODE_DEVICE_OWNER_PROVISIONING)
+        } else {
+            // Aparelho não elegível (já tem conta configurada, ou versão
+            // do Android sem suporte) - segue sem Device Owner; o bloqueio
+            // de Acessibilidade pode aparecer mais adiante neste caso.
+            pendingEnrollToken?.let { proceedToEnroll(it) }
+        }
+    }
+
+    private fun proceedToEnroll(token: String) {
         buttonActivate.isEnabled = false
         buttonActivate.text = "Ativando..."
 
@@ -218,6 +279,23 @@ class MainActivity : AppCompatActivity() {
             }
             startForegroundService(serviceIntent)
         }
+
+        if (requestCode == REQUEST_CODE_DEVICE_OWNER_PROVISIONING) {
+            val token = pendingEnrollToken
+            pendingEnrollToken = null
+            if (resultCode == Activity.RESULT_OK && token != null) {
+                proceedToEnroll(token)
+            } else {
+                buttonActivate.isEnabled = true
+                buttonActivate.text = "Ativar este aparelho"
+                Toast.makeText(
+                    this,
+                    "Não foi possível concluir a gestão do aparelho. Confirme que nenhuma conta " +
+                        "foi adicionada neste celular ainda e tente de novo.",
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -228,6 +306,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         const val REQUEST_CODE_SCREEN_CAPTURE = 100
         const val REQUEST_CODE_NOTIFICATIONS = 200
+        const val REQUEST_CODE_DEVICE_OWNER_PROVISIONING = 300
         const val EXTRA_AUTO_REQUEST_CAPTURE = "autoRequestCapture"
     }
 }

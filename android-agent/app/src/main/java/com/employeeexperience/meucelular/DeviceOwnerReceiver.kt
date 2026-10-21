@@ -6,15 +6,19 @@ import android.content.Intent
 import android.util.Log
 
 /**
- * Recebe o evento de ativação como Device Owner (disparado depois do
- * provisionamento via QR code no primeiro boot do aparelho, ou via ADB em
- * ambiente de teste: `adb shell dpm set-device-owner
+ * Recebe o evento de ativação como Device Owner. DECISÃO (21/10/2026, ver
+ * roadmap.md): o caminho principal agora é o próprio MainActivity chamando
+ * ACTION_PROVISION_MANAGED_DEVICE depois do instalar normal pelo link (sem
+ * QR, sem ADB, sem computador) - ver
+ * MainActivity.requestDeviceOwnerProvisioning(). Os caminhos antigos
+ * continuam existindo e disparam o mesmo evento: provisionamento via QR
+ * code no primeiro boot (Android Enterprise) ou via ADB em ambiente de
+ * teste (`adb shell dpm set-device-owner
  * com.employeeexperience.meucelular/.DeviceOwnerReceiver`).
  *
- * Device Owner só pode ser concedido em um aparelho recém-resetado, sem
- * conta Google configurada ainda - por isso o enrollment corporativo
- * precisa acontecer ANTES de o aparelho ser entregue ao profissional,
- * exatamente como desenhado na tela de onboarding do TI.
+ * Em qualquer um dos três caminhos, Device Owner só pode ser concedido
+ * enquanto o aparelho não tem nenhuma conta configurada - por isso precisa
+ * acontecer antes de qualquer conta Google ser adicionada ao aparelho.
  */
 class DeviceOwnerReceiver : DeviceAdminReceiver() {
 

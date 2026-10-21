@@ -226,8 +226,8 @@ function InstalarPage() {
               </p>
 
               <div className="mt-4 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-foreground">
-                Confirme que você está abrindo esta página no navegador do próprio celular que quer
-                poder acessar remotamente — não em outro computador.
+                Use um celular recém-resetado, ainda sem nenhuma conta Google configurada, e abra
+                esta página no navegador desse mesmo celular — não em outro computador.
               </div>
 
               <ol className="mt-5 space-y-2 text-sm text-muted-foreground">
@@ -238,8 +238,8 @@ function InstalarPage() {
                 </li>
                 <li>
                   3. Depois de instalado, toque neste mesmo link de novo (ex: na notificação de
-                  download): o app abre sozinho já ativado, e este link vira o acesso remoto ao
-                  aparelho.
+                  download): o app abre, pede uma única confirmação para gerenciar o aparelho e já
+                  fica ativado — e este link vira o acesso remoto ao aparelho.
                 </li>
               </ol>
 

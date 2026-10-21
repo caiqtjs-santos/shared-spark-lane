@@ -15,6 +15,12 @@
 
 - DECISÃO (19/10/2026): comandos remotos de aparelho (bloquear tela / reiniciar / apagar) via **Device Owner**, não via Android Management API (que ainda nem está configurada). O app já é Device Owner e chama `DevicePolicyManager.lockNow()` / `reboot()` / `wipeData(0)` localmente; o painel só grava uma linha em `device_commands` e o app busca por polling em `/api/public/agent/commands` (mesmo padrão de `session_inputs` / "zero dependência nova" do espelhamento sem WebRTC). Só o TI envia (ações administrativas/destrutivas); TI e dono do aparelho leem. Apagar exige diálogo de confirmação no painel E `confirmWipe` no servidor. Auditoria: `comando_enviado` e `comando_entregue`. Migration `20261020010500_device_commands.sql` aplicada no banco em 19/10/2026.
 
+- DECISÃO (21/10/2026): **instalação em 2 toques sem bloqueio do Android — sem QR code, sem ADB, sem Google/Android Enterprise, sem computador.** O bloqueio de "Configurações restritas" do Android 13+ (que impedia ativar a Acessibilidade depois de instalar o app por fora da Play Store) é evitado fazendo o próprio app virar "dono do aparelho" (Device Owner) assim que é instalado — sem passo extra nenhum pra quem usa.
+  - `MainActivity.onActivateClicked()`: antes de chamar o enrollment, se o app ainda não é Device Owner (`isDeviceOwnerApp`), dispara `Intent(DevicePolicyManager.ACTION_PROVISION_MANAGED_DEVICE)` apontando pro `DeviceOwnerReceiver` já existente (`requestDeviceOwnerProvisioning`). É a mesma tela nativa do Android que já existia no fluxo por QR code do Android Enterprise, só que chamada pelo app já instalado, em vez de durante o assistente de configuração — caminho documentado pelo próprio Android ("if your app is already installed on the device", https://developer.android.com/work/dpc/build-dpc).
+  - Só funciona em aparelho sem nenhuma conta configurada ainda (mesmo requisito que o QR já tinha) — texto de `/instalar/<token>` atualizado pra avisar isso.
+  - Se o aparelho não for elegível (já tem conta, ou intent não resolve), segue direto pro enrollment sem Device Owner — nesse caso o bloqueio de Acessibilidade ainda pode aparecer; não há fallback de código pra esse caso.
+  - **NÃO testado em hardware físico** — em especial, não está confirmado que apps que viram Device Owner por este caminho (fora do assistente de configuração inicial) ficam de fato isentos do bloqueio de "Configurações restritas" ao ativar a Acessibilidade depois. Essa é a única incerteza real do que foi descrito aqui; o resto (requisito de aparelho sem conta, o app poder chamar essa tela sozinho) é comportamento documentado do Android.
+
 - DECISÃO (20/10/2026): **login do profissional eliminado por completo — só o time de TI tem login.** Inspirado no fluxo do BTMOB (ver conversa) e simplifica a entrega: o TI compartilha 1 link, não link + código + senha.
   - O profissional nunca digita usuário/senha/código. O MESMO link que o TI gera em "Cadastrar aparelho" (`devices.enrollment_token`, exposto em `/instalar/<token>`) serve para as duas coisas: enquanto o aparelho está pendente, é o fluxo de ativação (baixar/instalar o app); assim que fica ativo, a mesma página vira direto o painel de acesso remoto (motivo do acesso, iniciar/encerrar sessão, ver/controlar tela) — sem nenhum passo de login no meio.
   - Autenticação do profissional passa a ser só a posse do token no link — mesmo modelo de confiança que o `device_secret` já usa para o app Android nas rotas `/api/public/agent/*`. Funções novas em `src/lib/device-access.functions.ts` (`getDeviceByToken`, `startSessionByToken`, `endSessionByToken`, `getDeviceFrameUrlByToken`, `sendDeviceInputByToken`), todas públicas (sem `requireSupabaseAuth`), revalidando o token a cada chamada.
@@ -38,10 +44,9 @@
 - [x] Build do APK passando (jar, gradlew, flag AndroidX resolvidos)
 - [x] APK publicado dentro do site (public/app/meu-celular-agente.apk)
 - [ ] Republicar o site para o link de download ficar no ar
-- [ ] Instalação no celular: CONFIRMADO bloqueio do Play Protect (não é debug-vs-release; assinatura de release não resolve).
-      Causa: combo Device Owner + Accessibility + MediaProjection instalado fora da Play Store = padrão que o Google trata como stalkerware. Não dá para contornar com código.
-      Caminho definido: Android Enterprise — app privado no Managed Google Play + Android Management API (gratuito; exige conta Google/Cloud da empresa).
-      DECISÃO (22/09/2026): seguir agora. Empresa SEM Google Workspace → enterprise no modo Managed Google Play Accounts (Google cria a conta de gestão gratuitamente).
+- [ ] Instalação no celular: CONFIRMADO bloqueio do Play Protect / "Configurações restritas" (não é debug-vs-release; assinatura de release não resolve).
+      Causa: combo Device Owner + Accessibility + MediaProjection instalado fora da Play Store = padrão que o Google trata como stalkerware. Não dá para contornar com código... instalando como app comum.
+      ~~Caminho definido: Android Enterprise — app privado no Managed Google Play + Android Management API.~~ **Pausado em 21/10/2026 — decisão "vamos seguir sem usar o Google": exige Google Cloud/empresa, computador para publicar o AAB, e ainda não resolve por si só o bloqueio de Acessibilidade.** Os itens abaixo ficam como já feitos, mas não são mais o caminho principal — ver a decisão de 21/10/2026 acima (Device Owner via `ACTION_PROVISION_MANAGED_DEVICE` no primeiro toque em "Ativar", sem QR/Google/computador).
   - [x] Passo a passo para quem decide (arquivo: android-enterprise-guia.md)
   - [ ] Empresa criar projeto no Google Cloud com Android Management API + conta de serviço (chave JSON) — colar em ANDROID_MANAGEMENT_SA_JSON (formulário seguro)
   - [x] Project ID do Google Cloud guardado (GOOGLE_CLOUD_PROJECT_ID = long-carving-509414-d3)
@@ -50,7 +55,7 @@
   - [ ] Publicar o app como app privado no Managed Google Play (AAB assinado)
   - [ ] Detectar automaticamente quando o aparelho conclui o provisionamento (Pub/Sub ou consulta periódica) — hoje o status ainda depende do aceite manual
   - [ ] Ajustar o app Android para rodar como app gerenciado pela política
-- [ ] Testar o fluxo de ativação em 2 toques num Android real
+- [ ] Testar o fluxo de ativação em 2 toques (agora com o passo de Device Owner embutido) num Android real
 
 ## A função central
 - [x] Ver a tela do celular — implementado SEM WebRTC (ver decisão 05/10/2026): MediaProjection → JPEG → upload pro backend → painel busca em polling. Código escrito e revisado, mas **nunca testado num aparelho físico** (ScreenCaptureService.kt).
