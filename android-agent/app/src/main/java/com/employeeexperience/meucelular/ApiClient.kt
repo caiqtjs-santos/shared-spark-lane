@@ -29,12 +29,20 @@ class ApiClient(private val baseUrl: String = BASE_URL) {
 
     class ApiException(message: String) : Exception(message)
 
-    /** Troca o token de ativação (do link /instalar/<token>) por um segredo permanente do aparelho. */
+    /**
+     * Troca o token de ativação (do link /instalar/<token>) por um segredo
+     * permanente do aparelho. `deviceOwner` reflete se o Android concedeu
+     * "dono do aparelho" a este app NESTE enrollment (ver
+     * MainActivity.requestDeviceOwnerProvisioning) - o painel usa isso pra
+     * decidir se mostra os comandos remotos (bloquear/reiniciar/apagar)
+     * pra este aparelho específico.
+     */
     @Throws(IOException::class, ApiException::class)
-    fun enroll(enrollmentToken: String, model: String): EnrollResult {
+    fun enroll(enrollmentToken: String, model: String, deviceOwner: Boolean): EnrollResult {
         val body = JSONObject().apply {
             put("enrollmentToken", enrollmentToken)
             put("model", model)
+            put("deviceOwner", deviceOwner)
         }.toString().toRequestBody(jsonMediaType)
 
         val request = Request.Builder()

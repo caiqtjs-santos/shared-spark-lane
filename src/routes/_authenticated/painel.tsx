@@ -444,9 +444,15 @@ function TiView({ data }: { data: Workspace }) {
                       Gerar QR de provisionamento
                     </Button>
                   )}
-                  {d.enrollment_status === "ativo" && (
-                    <DeviceCommandButtons deviceId={d.id} deviceName={d.name} />
-                  )}
+                  {d.enrollment_status === "ativo" &&
+                    (d.device_owner ? (
+                      <DeviceCommandButtons deviceId={d.id} deviceName={d.name} />
+                    ) : (
+                      <p className="max-w-56 text-right text-xs text-muted-foreground">
+                        Sem bloquear/reiniciar/apagar remotos neste aparelho (já tinha conta
+                        configurada ao ativar). Ver/controlar tela continuam disponíveis.
+                      </p>
+                    ))}
                   {d.enrollment_status !== "revogado" && (
                     <Button
                       variant="outline"

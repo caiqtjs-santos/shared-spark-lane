@@ -35,6 +35,12 @@ export const Route = createFileRoute("/api/public/agent/enroll")({
             // rotação de tela em tempo real.
             screenWidth: z.number().int().positive().max(20000).optional(),
             screenHeight: z.number().int().positive().max(20000).optional(),
+            // Ver decisão de 23/10/2026 (roadmap.md) e migração
+            // 20261023013000_device_owner_column.sql: só true quando o
+            // Android concedeu "dono do aparelho" a este app neste
+            // enrollment - decide se o painel pode mandar bloquear/
+            // reiniciar/apagar remotamente neste aparelho.
+            deviceOwner: z.boolean().optional(),
           })
           .safeParse(body);
         if (!parsed.success) return json({ error: "Dados inválidos" }, 400);
@@ -63,6 +69,7 @@ export const Route = createFileRoute("/api/public/agent/enroll")({
             ...(parsed.data.pushToken ? { push_token: parsed.data.pushToken } : {}),
             ...(parsed.data.screenWidth ? { screen_width: parsed.data.screenWidth } : {}),
             ...(parsed.data.screenHeight ? { screen_height: parsed.data.screenHeight } : {}),
+            device_owner: parsed.data.deviceOwner === true,
           })
           .eq("id", device.id);
         if (error) return json({ error: error.message }, 500);

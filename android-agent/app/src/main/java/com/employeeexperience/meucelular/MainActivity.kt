@@ -166,7 +166,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        proceedToEnroll(token)
+        proceedToEnroll(token, deviceOwner = true)
     }
 
     private fun isDeviceOwner(): Boolean {
@@ -195,21 +195,30 @@ class MainActivity : AppCompatActivity() {
             @Suppress("DEPRECATION")
             startActivityForResult(intent, REQUEST_CODE_DEVICE_OWNER_PROVISIONING)
         } else {
-            // Aparelho não elegível (já tem conta configurada, ou versão
-            // do Android sem suporte) - segue sem Device Owner; o bloqueio
-            // de Acessibilidade pode aparecer mais adiante neste caso.
-            pendingEnrollToken?.let { proceedToEnroll(it) }
+            // Aparelho não tem o provisionamento nativo disponível nesta
+            // ROM - segue sem Device Owner, igual ao caso de aparelho já
+            // com conta configurada (ver onActivityResult).
+            pendingEnrollToken?.let { proceedToEnroll(it, deviceOwner = false) }
         }
     }
 
-    private fun proceedToEnroll(token: String) {
+    /**
+     * DECISÃO (23/10/2026, ver roadmap.md): aparelho já em uso (com conta
+     * configurada) não consegue virar Device Owner de nenhum jeito sem
+     * reset de fábrica - é um limite do Android, não de código. Em vez de
+     * travar a ativação nesse caso, o enrollment segue mesmo assim, só sem
+     * os comandos remotos administrativos (ver `deviceOwner` em
+     * ApiClient.enroll e o painel, que esconde esses botões quando
+     * `devices.device_owner` é false).
+     */
+    private fun proceedToEnroll(token: String, deviceOwner: Boolean) {
         buttonActivate.isEnabled = false
         buttonActivate.text = "Ativando..."
 
         scope.launch {
             try {
                 val result = withContext(Dispatchers.IO) {
-                    apiClient.enroll(token, model = Build.MODEL ?: "desconhecido")
+                    apiClient.enroll(token, model = Build.MODEL ?: "desconhecido", deviceOwner = deviceOwner)
                 }
                 deviceStore.deviceId = result.deviceId
                 deviceStore.deviceSecret = result.deviceSecret
@@ -283,17 +292,23 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == REQUEST_CODE_DEVICE_OWNER_PROVISIONING) {
             val token = pendingEnrollToken
             pendingEnrollToken = null
-            if (resultCode == Activity.RESULT_OK && token != null) {
-                proceedToEnroll(token)
-            } else {
+            if (token == null) {
                 buttonActivate.isEnabled = true
                 buttonActivate.text = "Ativar este aparelho"
+            } else if (resultCode == Activity.RESULT_OK) {
+                proceedToEnroll(token, deviceOwner = true)
+            } else {
+                // Cancelado/recusado - normalmente porque este aparelho já
+                // tinha conta configurada (aparelho já em uso, não um
+                // aparelho novo). Não é um erro a ser travado aqui: a
+                // ativação segue, só em modo limitado (ver proceedToEnroll).
                 Toast.makeText(
                     this,
-                    "Não foi possível concluir a gestão do aparelho. Confirme que nenhuma conta " +
-                        "foi adicionada neste celular ainda e tente de novo.",
+                    "Este aparelho já tinha conta configurada, então vai ativar sem bloqueio/" +
+                        "reinício/apagar remotos - ver e controlar a tela continuam disponíveis.",
                     Toast.LENGTH_LONG,
                 ).show()
+                proceedToEnroll(token, deviceOwner = false)
             }
         }
     }

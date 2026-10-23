@@ -60,12 +60,22 @@ export const issueDeviceCommand = createServerFn({ method: "POST" })
 
     const { data: device } = await db
       .from("devices")
-      .select("id, enrollment_status")
+      .select("id, enrollment_status, device_owner")
       .eq("id", data.deviceId)
       .maybeSingle();
     if (!device) throw new Error("Aparelho não encontrado.");
     if (device.enrollment_status !== "ativo")
       throw new Error("Este aparelho não está ativo.");
+    // Ver decisão de 23/10/2026 (roadmap.md): só aparelho que virou "dono
+    // do aparelho" no enrollment aceita estes comandos - aparelho que já
+    // estava em uso (com conta configurada) não consegue isso sem reset de
+    // fábrica, então nunca executaria o comando mesmo que a gente mandasse.
+    if (!device.device_owner)
+      throw new Error(
+        "Este aparelho foi ativado sem virar \"dono do aparelho\" (provavelmente já tinha conta " +
+          "configurada) - bloquear/reiniciar/apagar remotos não funcionam nele. Só reset de " +
+          "fábrica e reativação resolvem isso.",
+      );
 
     // Evita empilhar o mesmo comando por cliques repetidos enquanto o
     // aparelho ainda não buscou o anterior.

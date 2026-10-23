@@ -141,7 +141,7 @@ export const getWorkspace = createServerFn({ method: "GET" })
       supabase
         .from("devices")
         .select(
-          "id, name, model, enrollment_status, enrollment_token, professional_name, last_seen_at, battery_level, enrolled_at, created_at",
+          "id, name, model, enrollment_status, enrollment_token, professional_name, device_owner, last_seen_at, battery_level, enrolled_at, created_at",
         )
         .order("created_at", { ascending: false }),
       supabase
