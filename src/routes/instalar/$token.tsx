@@ -27,12 +27,12 @@ import { toast } from "sonner";
  *     profissional abre o link (de qualquer aparelho/navegador, não precisa
  *     ser o celular gerenciado) e já cai direto no painel, sem digitar nada.
  *
- * Fluxo de 2 toques pra instalar, sem digitar nada: no 1º toque (app ainda
- * não instalado), o Android não tem quem abra o link "meucelular://ativar" e
- * cai no fallback, que é ESTA página — a pessoa baixa e instala o .apk
- * normalmente. Depois de instalado, reabrir o MESMO link faz o Android abrir
- * direto dentro do app já com o token — ver o intent-filter de
- * "meucelular://ativar" no AndroidManifest.xml.
+ * Instalar sem digitar nada: a pessoa abre o link, baixa e instala o .apk
+ * normalmente nesta página. Depois de instalado, há um botão "abrir no app"
+ * que dispara o intent "meucelular://ativar" já com o token (ver o
+ * intent-filter no AndroidManifest.xml). A abertura NÃO é automática de
+ * propósito: abrir o app sozinho no carregamento, quando ele ainda não existe,
+ * caía no fallback (esta página) e virava um laço infinito ("piscando").
  */
 export const Route = createFileRoute("/instalar/$token")({
   head: () => ({
@@ -124,45 +124,23 @@ function InstalarPage() {
     });
   }
 
-  // Tenta abrir o app já instalado, passando o token direto. Se não houver
-  // app instalado para tratar o link, o Android usa o browser_fallback_url -
-  // que é ESTA mesma página. Sem trava, isso vira um laço: a página recarrega,
-  // dispara o intent de novo, recarrega... (fica "piscando" no Carregando).
-  //
-  // Trava: só dispara o intent se não tivermos disparado nos últimos segundos.
-  // O "retorno" do fallback acontece em milissegundos, então ao recarregar a
-  // marca ainda está fresca e NÃO redisparamos - a pessoa vê a página de
-  // instalação. Uma reabertura deliberada bem depois (ex.: após instalar o
-  // app) passa da janela e volta a tentar abrir o app. Guardado por token.
-  useEffect(() => {
-    if (data?.status !== "pendente") return;
-    if (typeof navigator === "undefined" || !/Android/i.test(navigator.userAgent)) return;
+  // Abrir o app já instalado (passando o token direto) - SÓ por toque do
+  // usuário, nunca automático. A abertura automática no carregamento era o que
+  // causava o laço: quando o app não está instalado, o Android cai no
+  // browser_fallback_url (ESTA mesma página), que recarregava e redisparava o
+  // intent sem parar - a tela ficava "piscando" no Carregando e abrindo aba
+  // atrás de aba. Com o botão, se o app não existir o Android apenas volta a
+  // mostrar esta página (uma vez), sem laço.
+  const isAndroid =
+    typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 
-    const key = `instalar:intent:${token}`;
-    let last = 0;
-    try {
-      last = Number(sessionStorage.getItem(key) || 0);
-    } catch {
-      last = 0;
-    }
-    // Se a última tentativa foi há menos de 4s, é o retorno do fallback - não
-    // redispara (quebra o laço).
-    if (Date.now() - last < 4_000) return;
-    try {
-      sessionStorage.setItem(key, String(Date.now()));
-    } catch {
-      // sessionStorage bloqueado (aba privada etc.): sem a trava, melhor não
-      // arriscar o laço - não dispara o intent automático.
-      return;
-    }
-
+  function openInApp() {
     const fallback = encodeURIComponent(window.location.href);
     const intentUrl =
       `intent://ativar?token=${encodeURIComponent(token)}` +
       `#Intent;scheme=meucelular;package=${ANDROID_PACKAGE};S.browser_fallback_url=${fallback};end`;
-
     window.location.href = intentUrl;
-  }, [data?.status, token]);
+  }
 
   // Fonte de dados do espelho (device-mirror.tsx) autenticada pelo token do
   // link — ver device-access.functions.ts.
@@ -257,6 +235,16 @@ function InstalarPage() {
               <p className="mt-2 text-sm text-muted-foreground">
                 {data.name} · {data.model}
               </p>
+
+              {isAndroid && (
+                <button
+                  type="button"
+                  onClick={openInApp}
+                  className="mt-4 w-full rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-medium text-primary"
+                >
+                  Já instalou o app neste celular? Toque para abrir
+                </button>
+              )}
 
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <button
