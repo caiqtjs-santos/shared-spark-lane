@@ -35,6 +35,12 @@
   - Painel: os botões de bloquear/reiniciar/apagar só aparecem quando `device_owner` é `true`; nos outros, mostra uma nota explicando o motivo em vez de deixar a pessoa mandar um comando que seria ignorado em silêncio. `issueDeviceCommand` também recusa no servidor, por segurança (mesmo padrão do `enrollment_status !== "ativo"`).
   - **NÃO testado em hardware físico.**
 
+- DECISÃO (23/10/2026, noite): **melhor suporte ao celular JÁ EM USO, dentro do limite da plataforma — sem inventar comando que não existe.** Não muda nada do limite (aparelho já em uso não vira Device Owner sem reset → sem bloquear/reiniciar/apagar). O que mudou é a orientação, que antes só cobria o celular novo/resetado:
+  - Página `/instalar/<token>`: agora tem um seletor "Celular novo / resetado" × "Celular já em uso", começando em "novo" para NÃO alterar o caminho que já está em produção — o caminho "em uso" é adicionado ao lado. No caminho "em uso", o texto explica que ele ativa com ver/controlar, sem os 3 comandos administrativos, e que controlar exige ligar a Acessibilidade manualmente.
+  - App Android (`MainActivity.showAccessibilityGuide`): quando o enrollment termina sem Device Owner (`!deviceOwner`), mostra um diálogo guiando o passo manual da Acessibilidade e abrindo a tela de "Informações do app" via `Settings.ACTION_APPLICATION_DETAILS_SETTINGS`. O menu "⋮ → Permitir configurações restritas" NÃO tem Action/Intent própria documentada, então é instrução em texto + abrir a tela de Informações do app; não se tenta automatizar o toque nos 3 pontinhos.
+  - Painel do TI: a nota do aparelho sem Device Owner agora diz que controlar exige a Acessibilidade ligada (ver funciona direto).
+  - **NÃO testado em hardware físico.**
+
 ## Bloqueando agora
 - [ ] **Banco novo (brazmbstdzinxgdydxlk) criado e com as migrations aplicadas, mas ainda não é o banco em uso de verdade:**
   - [ ] **Único passo que falta, e só o dono da conta consegue fazer:** pegar a chave secreta do projeto em supabase.com/dashboard/project/brazmbstdzinxgdydxlk/settings/api-keys ("Secret keys", começa com `sb_secret_`; a `service_role` antiga também serve) e cadastrar no Lovable em More → Cloud → Secrets → Add secret, com o nome **`MEUCELULAR_SERVICE_ROLE_KEY`**. Sem ela o painel abre, mas cadastrar aparelho, iniciar sessão e o app do celular respondem com erro.

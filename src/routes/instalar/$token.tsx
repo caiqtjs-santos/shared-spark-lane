@@ -99,6 +99,15 @@ function InstalarPage() {
     return undefined;
   }, [data?.status]);
 
+  // Caminho de instalação (ver roadmap 23/10/2026): "novo" = celular
+  // recém-resetado, que vira "dono do aparelho" e ganha todos os comandos;
+  // "em_uso" = celular que já tem conta/apps/dados, que ativa com ver/
+  // controlar mas SEM bloquear/reiniciar/apagar. Só muda o texto e o guia
+  // desta página; o backend trata os dois igual (o device_owner real vem do
+  // app no enrollment). Começa em "novo" para não alterar o caminho que já
+  // está em produção.
+  const [deviceCondition, setDeviceCondition] = useState<"novo" | "em_uso">("novo");
+
   // Aceite explícito antes de baixar o app: fica registrado na auditoria do
   // aparelho (POST em device-info). O botão de baixar só libera depois.
   const [accepted, setAccepted] = useState(false);
@@ -225,23 +234,79 @@ function InstalarPage() {
                 {data.name} · {data.model}
               </p>
 
-              <div className="mt-4 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-foreground">
-                Use um celular recém-resetado, ainda sem nenhuma conta Google configurada, e abra
-                esta página no navegador desse mesmo celular — não em outro computador.
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDeviceCondition("novo")}
+                  className={`rounded-lg border px-3 py-2 text-xs transition-colors ${
+                    deviceCondition === "novo"
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  Celular novo / resetado
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeviceCondition("em_uso")}
+                  className={`rounded-lg border px-3 py-2 text-xs transition-colors ${
+                    deviceCondition === "em_uso"
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  Celular já em uso
+                </button>
               </div>
 
-              <ol className="mt-5 space-y-2 text-sm text-muted-foreground">
-                <li>1. Marque o aceite e toque em "Baixar e ativar app de gestão" abaixo.</li>
-                <li>
-                  2. Instale o arquivo baixado (o Android vai pedir para autorizar instalação de
-                  fora da Play Store — é esperado, e só precisa autorizar uma vez).
-                </li>
-                <li>
-                  3. Depois de instalado, toque neste mesmo link de novo (ex: na notificação de
-                  download): o app abre, pede uma única confirmação para gerenciar o aparelho e já
-                  fica ativado — e este link vira o acesso remoto ao aparelho.
-                </li>
-              </ol>
+              {deviceCondition === "novo" ? (
+                <>
+                  <div className="mt-4 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-foreground">
+                    Use um celular recém-resetado, ainda sem nenhuma conta Google configurada, e abra
+                    esta página no navegador desse mesmo celular — não em outro computador.
+                  </div>
+
+                  <ol className="mt-5 space-y-2 text-sm text-muted-foreground">
+                    <li>1. Marque o aceite e toque em "Baixar e ativar app de gestão" abaixo.</li>
+                    <li>
+                      2. Instale o arquivo baixado (o Android vai pedir para autorizar instalação de
+                      fora da Play Store — é esperado, e só precisa autorizar uma vez).
+                    </li>
+                    <li>
+                      3. Depois de instalado, toque neste mesmo link de novo (ex: na notificação de
+                      download): o app abre, pede uma única confirmação para gerenciar o aparelho e já
+                      fica ativado — e este link vira o acesso remoto ao aparelho.
+                    </li>
+                  </ol>
+                </>
+              ) : (
+                <>
+                  <div className="mt-4 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-foreground">
+                    Para um celular que já está em uso (com conta Google, apps e dados): ele é
+                    ativado e você poderá <strong>ver e controlar a tela</strong>. Bloquear,
+                    reiniciar e apagar remotos <strong>não</strong> ficam disponíveis neste caso —
+                    isso só em celular resetado. Abra esta página no navegador do próprio celular.
+                  </div>
+
+                  <ol className="mt-5 space-y-2 text-sm text-muted-foreground">
+                    <li>1. Marque o aceite e toque em "Baixar e ativar app de gestão" abaixo.</li>
+                    <li>
+                      2. Instale o arquivo baixado (o Android vai pedir para autorizar instalação de
+                      fora da Play Store — é esperado, e só precisa autorizar uma vez).
+                    </li>
+                    <li>
+                      3. Abra o app e toque em ativar. Como o celular já está em uso, ele é ativado
+                      sem virar "dono do aparelho" — e este link vira o acesso remoto.
+                    </li>
+                    <li>
+                      4. Para <strong>controlar</strong> a tela (não só ver), o próprio app vai te
+                      mostrar o passo para ligar a Acessibilidade nas Configurações do Android — um
+                      passo manual que o Android exige para apps instalados fora da Play Store. Só
+                      ver a tela não precisa disso.
+                    </li>
+                  </ol>
+                </>
+              )}
 
               <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-muted/40 px-3 py-3 text-sm text-foreground">
                 <input

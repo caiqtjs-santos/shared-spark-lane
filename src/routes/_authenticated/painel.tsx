@@ -450,7 +450,8 @@ function TiView({ data }: { data: Workspace }) {
                     ) : (
                       <p className="max-w-56 text-right text-xs text-muted-foreground">
                         Sem bloquear/reiniciar/apagar remotos neste aparelho (já tinha conta
-                        configurada ao ativar). Ver/controlar tela continuam disponíveis.
+                        configurada ao ativar). Ver a tela funciona; controlar exige a
+                        Acessibilidade ligada no aparelho (o app guia esse passo).
                       </p>
                     ))}
                   {d.enrollment_status !== "revogado" && (

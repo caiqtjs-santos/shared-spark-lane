@@ -5,13 +5,16 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import kotlinx.coroutines.CoroutineScope
@@ -225,12 +228,62 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this@MainActivity, "Aparelho ativado.", Toast.LENGTH_SHORT).show()
                 renderEnrollmentState()
                 startSessionWatcher()
+                // Aparelho já em uso (não virou "dono do aparelho"): o Android
+                // bloqueia a Acessibilidade por trás de "Configurações
+                // restritas", então controlar a tela depende de um passo
+                // manual. Guiamos esse passo aqui; ver a tela não precisa dele.
+                if (!deviceOwner) showAccessibilityGuide()
             } catch (e: Exception) {
                 Toast.makeText(this@MainActivity, "Não foi possível ativar: ${e.message}", Toast.LENGTH_LONG).show()
             } finally {
                 buttonActivate.isEnabled = true
                 buttonActivate.text = "Ativar este aparelho"
             }
+        }
+    }
+
+    /**
+     * Guia do passo manual de Acessibilidade para aparelho já em uso (sem
+     * Device Owner). No Android 13+, ativar a Acessibilidade de um app
+     * instalado fora da Play Store fica atrás de "Configurações restritas",
+     * e NÃO há Intent/Action documentada que pule direto para esse item do
+     * menu de 3 pontinhos (⋮) - quem toca nele é a própria pessoa. Então o
+     * que dá para automatizar é abrir a tela de "Informações do app"
+     * (ACTION_APPLICATION_DETAILS_SETTINGS); o resto é instrução em texto.
+     * Só aparece quando o aparelho ativou sem virar "dono do aparelho".
+     */
+    private fun showAccessibilityGuide() {
+        AlertDialog.Builder(this)
+            .setTitle("Falta um passo para controlar a tela")
+            .setMessage(
+                "Este celular já estava em uso, então o Android pede para liberar a Acessibilidade " +
+                    "manualmente antes de o app poder controlar a tela. (Só ver a tela não precisa " +
+                    "disso.)\n\n" +
+                    "Na tela de \"Informações do app\" que vai abrir:\n" +
+                    "1. Toque no menu de 3 pontinhos (⋮), no canto superior.\n" +
+                    "2. Toque em \"Permitir configurações restritas\".\n" +
+                    "3. Volte, abra Acessibilidade e ative \"Gestão Corporativa\".\n\n" +
+                    "Se o menu de 3 pontinhos não aparecer, a Acessibilidade já está liberada - é só " +
+                    "ativá-la.",
+            )
+            .setPositiveButton("Abrir Informações do app") { _, _ -> openAppDetailsSettings() }
+            .setNegativeButton("Agora não", null)
+            .show()
+    }
+
+    /** Abre a tela de "Informações do app" deste app nas Configurações. */
+    private fun openAppDetailsSettings() {
+        try {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", packageName, null)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(
+                this,
+                "Abra manualmente: Configurações > Apps > Gestão Corporativa.",
+                Toast.LENGTH_LONG,
+            ).show()
         }
     }
 
