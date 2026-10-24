@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/lib/backend/auth-middleware";
+import { callGateway } from "@/lib/backend/gateway.server";
 import { z } from "zod";
-import { codeToEmail } from "@/lib/login-code";
 
 const sixDigits = z.string().regex(/^\d{6}$/, "O código precisa ter exatamente 6 dígitos numéricos.");
 
@@ -18,10 +18,14 @@ function parseInput<T extends z.ZodTypeAny>(schema: T, input: unknown): z.infer<
   return result.data;
 }
 
-async function admin() {
-  const { supabaseAdmin } = await import("@/lib/backend/admin.server");
-  return supabaseAdmin;
-}
+/**
+ * NOTA (decisão de 24/10/2026, ver roadmap.md): as operações privilegiadas
+ * (escrita com service_role) saíram daqui e foram para a Edge Function
+ * "gateway" do Supabase (supabase/functions/gateway), que o Supabase injeta
+ * a chave sozinho. Estas funções agora só validam a entrada e repassam a
+ * ação para o gateway, encaminhando o JWT do TI. `getWorkspace` continua
+ * local porque só LÊ, pelo cliente autenticado do próprio usuário (RLS).
+ */
 
 async function isTi(context: { supabase: any; userId: string }) {
   const { data } = await context.supabase.rpc("has_role", {
@@ -29,68 +33,6 @@ async function isTi(context: { supabase: any; userId: string }) {
     _role: "ti",
   });
   return data === true;
-}
-
-async function logAudit(
-  db: any,
-  entry: {
-    event_type: string;
-    device_id?: string | null;
-    user_id?: string | null;
-    session_id?: string | null;
-    details?: Record<string, unknown> | null;
-  },
-) {
-  await db.from("audit_log").insert(entry);
-}
-
-/**
- * Cria um login completo (usuário de autenticação + perfil + papel) pelo
- * servidor, já confirmado. É feito pela API de administração de propósito:
- * o "e-mail" do login é só um endereço interno derivado do código de 6
- * dígitos (ver login-code.ts), então não existe caixa de entrada para
- * confirmar - o cadastro comum pelo navegador falha em projetos que exigem
- * confirmação de e-mail ("Email address ... is invalid").
- */
-async function createLogin(
-  db: any,
-  input: { loginCode: string; password: string; name: string },
-) {
-  const { data: taken } = await db
-    .from("profiles")
-    .select("id")
-    .eq("login_code", input.loginCode)
-    .maybeSingle();
-  if (taken) throw new Error("Esse código de acesso já está em uso. Escolha outro.");
-
-  const { data: created, error: createError } = await db.auth.admin.createUser({
-    email: codeToEmail(input.loginCode),
-    password: input.password,
-    email_confirm: true,
-  });
-  if (createError || !created?.user) {
-    const message = createError?.message ?? "";
-    if (/already|registered|exists/i.test(message))
-      throw new Error("Esse código de acesso já está em uso. Escolha outro.");
-    throw new Error(`Não foi possível criar o login${message ? `: ${message}` : "."}`);
-  }
-  const userId = created.user.id as string;
-
-  const { error: profileError } = await db
-    .from("profiles")
-    .insert({ id: userId, login_code: input.loginCode, name: input.name });
-  const { error: roleError } = profileError
-    ? { error: null }
-    : await db.from("user_roles").insert({ user_id: userId, role: "ti" });
-
-  if (profileError || roleError) {
-    // Não deixa um usuário de autenticação órfão (sem perfil/papel) para trás.
-    await db.from("profiles").delete().eq("id", userId);
-    await db.auth.admin.deleteUser(userId);
-    throw new Error((profileError ?? roleError)?.message ?? "Não foi possível criar o login.");
-  }
-
-  return userId;
 }
 
 /**
@@ -112,21 +54,11 @@ export const createTiAccount = createServerFn({ method: "POST" })
     ),
   )
   .handler(async ({ data }) => {
-    const db = await admin();
-
-    const userId = await createLogin(db, {
+    return callGateway<{ ok: true }>("createTiAccount", {
       loginCode: data.loginCode,
       password: data.password,
       name: data.name,
     });
-
-    await logAudit(db, {
-      event_type: "conta_criada",
-      user_id: userId,
-      details: { role: "ti" },
-    });
-
-    return { ok: true as const };
   });
 
 /** Perfil, papel, aparelhos, sessão ativa e histórico do usuário logado. */
@@ -186,39 +118,17 @@ export const registerDevice = createServerFn({ method: "POST" })
       input,
     ),
   )
-  .handler(async ({ data, context }) => {
-    if (!(await isTi(context))) throw new Error("Apenas o time de TI pode cadastrar aparelhos.");
-    const db = await admin();
-
-    const enrollmentToken = crypto.randomUUID();
-    const { data: device, error } = await db
-      .from("devices")
-      .insert({
-        professional_name: data.professionalName,
-        name: data.deviceName,
-        // Placeholder - o app Android manda o modelo real (Build.MODEL) no
-        // enrollment e sobrescreve isso automaticamente (ver enroll.ts).
-        model: "A confirmar na ativação",
-        enrollment_status: "pendente",
-        enrollment_token: enrollmentToken,
-      })
-      .select("id")
-      .single();
-    if (error) throw new Error(error.message);
-
-    await logAudit(db, {
-      event_type: "enrollment_iniciado",
-      device_id: device.id,
-      user_id: context.userId,
-      details: { professional_name: data.professionalName },
-    });
-
-    return {
-      deviceId: device.id as string,
-      deviceName: data.deviceName,
-      professionalName: data.professionalName,
-      enrollmentToken,
-    };
+  .handler(async ({ data }) => {
+    return callGateway<{
+      deviceId: string;
+      deviceName: string;
+      professionalName: string;
+      enrollmentToken: string;
+    }>(
+      "registerDevice",
+      { deviceName: data.deviceName, professionalName: data.professionalName },
+      { forwardAuth: true },
+    );
   });
 
 /**
@@ -238,37 +148,12 @@ export const acceptEnrollment = createServerFn({ method: "POST" })
       input,
     ),
   )
-  .handler(async ({ data, context }) => {
-    const db = await admin();
-
-    const { data: device } = await db
-      .from("devices")
-      .select("id, owner_user_id, enrollment_token, enrollment_status")
-      .eq("id", data.deviceId)
-      .maybeSingle();
-    if (!device) throw new Error("Aparelho não encontrado.");
-    if (!(await isTi(context)))
-      throw new Error("Apenas o time de TI pode concluir a ativação manualmente.");
-    if (device.enrollment_token !== data.enrollmentToken)
-      throw new Error("Token de ativação inválido.");
-
-    const { error } = await db
-      .from("devices")
-      .update({
-        enrollment_status: "ativo",
-        enrolled_at: new Date().toISOString(),
-        enrolled_by_user_id: context.userId,
-      })
-      .eq("id", data.deviceId);
-    if (error) throw new Error(error.message);
-
-    await logAudit(db, {
-      event_type: "enrollment_concluido",
-      device_id: data.deviceId,
-      user_id: context.userId,
-    });
-
-    return { ok: true as const };
+  .handler(async ({ data }) => {
+    return callGateway<{ ok: true }>(
+      "acceptEnrollment",
+      { deviceId: data.deviceId, enrollmentToken: data.enrollmentToken },
+      { forwardAuth: true },
+    );
   });
 
 /** TI revoga a gestão do aparelho e encerra qualquer sessão aberta. */
@@ -277,32 +162,15 @@ export const revokeDevice = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     parseInput(z.object({ deviceId: z.string().uuid("Identificador de aparelho inválido.") }), input),
   )
-  .handler(async ({ data, context }) => {
-    if (!(await isTi(context))) throw new Error("Apenas o time de TI pode revogar aparelhos.");
-    const db = await admin();
-
-    await db
-      .from("access_sessions")
-      .update({ status: "encerrada", ended_at: new Date().toISOString() })
-      .eq("device_id", data.deviceId)
-      .eq("status", "ativa");
-
-    const { error } = await db
-      .from("devices")
-      .update({ enrollment_status: "revogado", device_secret: null })
-      .eq("id", data.deviceId);
-    if (error) throw new Error(error.message);
-
-    await logAudit(db, {
-      event_type: "gestao_revogada",
-      device_id: data.deviceId,
-      user_id: context.userId,
-    });
-
-    return { ok: true as const };
+  .handler(async ({ data }) => {
+    return callGateway<{ ok: true }>(
+      "revokeDevice",
+      { deviceId: data.deviceId },
+      { forwardAuth: true },
+    );
   });
 
-/** O profissional inicia o acesso ao próprio aparelho, com motivo registrado. */
+/** O TI inicia o acesso a um aparelho ativo, com motivo registrado. */
 export const startSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -315,51 +183,12 @@ export const startSession = createServerFn({ method: "POST" })
       input,
     ),
   )
-  .handler(async ({ data, context }) => {
-    const db = await admin();
-    const ti = await isTi(context);
-
-    const { data: device } = await db
-      .from("devices")
-      .select("id, owner_user_id, enrollment_status")
-      .eq("id", data.deviceId)
-      .maybeSingle();
-    if (!device) throw new Error("Aparelho não encontrado.");
-    if (!ti && device.owner_user_id !== context.userId)
-      throw new Error("Você só pode acessar o próprio aparelho.");
-    if (device.enrollment_status !== "ativo")
-      throw new Error("Este aparelho ainda não está ativo.");
-
-    const { data: open } = await db
-      .from("access_sessions")
-      .select("id")
-      .eq("device_id", data.deviceId)
-      .eq("status", "ativa")
-      .maybeSingle();
-    if (open) throw new Error("Já existe uma sessão de acesso ativa para este aparelho.");
-
-    const { data: session, error } = await db
-      .from("access_sessions")
-      .insert({
-        device_id: data.deviceId,
-        requested_by_user_id: context.userId,
-        reason: data.reason,
-        mode: data.mode,
-        status: "ativa",
-      })
-      .select("id, started_at")
-      .single();
-    if (error) throw new Error(error.message);
-
-    await logAudit(db, {
-      event_type: "sessao_iniciada",
-      device_id: data.deviceId,
-      user_id: context.userId,
-      session_id: session.id,
-      details: { mode: data.mode, reason: data.reason },
-    });
-
-    return { sessionId: session.id as string, startedAt: session.started_at as string };
+  .handler(async ({ data }) => {
+    return callGateway<{ sessionId: string; startedAt: string }>(
+      "startSession",
+      { deviceId: data.deviceId, reason: data.reason, mode: data.mode },
+      { forwardAuth: true },
+    );
   });
 
 /** Encerra a sessão de acesso. */
@@ -368,32 +197,10 @@ export const endSession = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     parseInput(z.object({ sessionId: z.string().uuid("Identificador de sessão inválido.") }), input),
   )
-  .handler(async ({ data, context }) => {
-    const db = await admin();
-    const ti = await isTi(context);
-
-    const { data: session } = await db
-      .from("access_sessions")
-      .select("id, device_id, requested_by_user_id, status")
-      .eq("id", data.sessionId)
-      .maybeSingle();
-    if (!session) throw new Error("Sessão não encontrada.");
-    if (!ti && session.requested_by_user_id !== context.userId)
-      throw new Error("Você só pode encerrar as próprias sessões.");
-    if (session.status === "encerrada") return { ok: true as const };
-
-    const { error } = await db
-      .from("access_sessions")
-      .update({ status: "encerrada", ended_at: new Date().toISOString() })
-      .eq("id", data.sessionId);
-    if (error) throw new Error(error.message);
-
-    await logAudit(db, {
-      event_type: "sessao_encerrada",
-      device_id: session.device_id,
-      user_id: context.userId,
-      session_id: session.id,
-    });
-
-    return { ok: true as const };
+  .handler(async ({ data }) => {
+    return callGateway<{ ok: true }>(
+      "endSession",
+      { sessionId: data.sessionId },
+      { forwardAuth: true },
+    );
   });
