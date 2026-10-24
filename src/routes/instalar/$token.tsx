@@ -125,12 +125,36 @@ function InstalarPage() {
   }
 
   // Tenta abrir o app já instalado, passando o token direto. Se não houver
-  // app instalado para tratar o link, o navegador ignora silenciosamente e
-  // a pessoa só vê a página normal abaixo - nada quebra nesse caso.
+  // app instalado para tratar o link, o Android usa o browser_fallback_url -
+  // que é ESTA mesma página. Sem trava, isso vira um laço: a página recarrega,
+  // dispara o intent de novo, recarrega... (fica "piscando" no Carregando).
+  //
+  // Trava: só dispara o intent se não tivermos disparado nos últimos segundos.
+  // O "retorno" do fallback acontece em milissegundos, então ao recarregar a
+  // marca ainda está fresca e NÃO redisparamos - a pessoa vê a página de
+  // instalação. Uma reabertura deliberada bem depois (ex.: após instalar o
+  // app) passa da janela e volta a tentar abrir o app. Guardado por token.
   useEffect(() => {
     if (data?.status !== "pendente") return;
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    if (!isAndroid) return;
+    if (typeof navigator === "undefined" || !/Android/i.test(navigator.userAgent)) return;
+
+    const key = `instalar:intent:${token}`;
+    let last = 0;
+    try {
+      last = Number(sessionStorage.getItem(key) || 0);
+    } catch {
+      last = 0;
+    }
+    // Se a última tentativa foi há menos de 4s, é o retorno do fallback - não
+    // redispara (quebra o laço).
+    if (Date.now() - last < 4_000) return;
+    try {
+      sessionStorage.setItem(key, String(Date.now()));
+    } catch {
+      // sessionStorage bloqueado (aba privada etc.): sem a trava, melhor não
+      // arriscar o laço - não dispara o intent automático.
+      return;
+    }
 
     const fallback = encodeURIComponent(window.location.href);
     const intentUrl =
