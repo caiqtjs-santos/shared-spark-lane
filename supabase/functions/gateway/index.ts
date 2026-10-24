@@ -33,16 +33,43 @@ function json(body: unknown, status = 200) {
 
 class AppError extends Error {}
 
-/** Exige um JWT de usuário com papel 'ti'. Devolve o id do usuário. */
-async function requireTi(db: ReturnType<typeof admin>, authHeader: string | null) {
+/** Valida o JWT e devolve o id do usuário (sem exigir papel). */
+async function requireUser(db: ReturnType<typeof admin>, authHeader: string | null) {
   const jwt = authHeader?.replace(/^Bearer\s+/i, "")?.trim();
   if (!jwt) throw new AppError("Não autenticado.");
   const { data: userData, error } = await db.auth.getUser(jwt);
   if (error || !userData?.user) throw new AppError("Sessão inválida. Entre de novo.");
-  const userId = userData.user.id;
+  return userData.user.id;
+}
+
+/** Exige um JWT de usuário com papel 'ti'. Devolve o id do usuário. */
+async function requireTi(db: ReturnType<typeof admin>, authHeader: string | null) {
+  const userId = await requireUser(db, authHeader);
   const { data: isTi } = await db.rpc("has_role", { _user_id: userId, _role: "ti" });
   if (isTi !== true) throw new AppError("Apenas o time de TI pode fazer isso.");
   return userId;
+}
+
+/**
+ * Para o espelhamento: quem acessa precisa ser o DONO do aparelho ou do TI.
+ * Devolve o aparelho. Lança se não tiver acesso.
+ */
+async function requireDeviceOwnerOrTi(
+  db: ReturnType<typeof admin>,
+  authHeader: string | null,
+  deviceId: string,
+) {
+  const userId = await requireUser(db, authHeader);
+  const { data: device } = await db
+    .from("devices")
+    .select("id, owner_user_id")
+    .eq("id", deviceId)
+    .maybeSingle();
+  if (!device) throw new AppError("Aparelho não encontrado.");
+  if (device.owner_user_id === userId) return device;
+  const { data: isTi } = await db.rpc("has_role", { _user_id: userId, _role: "ti" });
+  if (isTi !== true) throw new AppError("Você não tem acesso a este aparelho.");
+  return device;
 }
 
 async function logAudit(
@@ -258,6 +285,187 @@ async function endSession(
   return { ok: true as const };
 }
 
+// ---- Comandos remotos (TI) ----------------------------------------------
+
+async function issueDeviceCommand(
+  db: ReturnType<typeof admin>,
+  userId: string,
+  p: { deviceId: string; kind: "lock" | "reboot" | "wipe"; confirmWipe?: boolean },
+) {
+  if (p.kind === "wipe" && p.confirmWipe !== true)
+    throw new AppError("Apagar o aparelho exige confirmação explícita.");
+
+  const { data: device } = await db
+    .from("devices")
+    .select("id, enrollment_status, device_owner")
+    .eq("id", p.deviceId)
+    .maybeSingle();
+  if (!device) throw new AppError("Aparelho não encontrado.");
+  if (device.enrollment_status !== "ativo") throw new AppError("Este aparelho não está ativo.");
+  // Decisão de 23/10/2026 (roadmap.md): só aparelho que virou "dono do
+  // aparelho" no enrollment aceita estes comandos.
+  if (!device.device_owner)
+    throw new AppError(
+      'Este aparelho foi ativado sem virar "dono do aparelho" (provavelmente já tinha conta ' +
+        "configurada) - bloquear/reiniciar/apagar remotos não funcionam nele. Só reset de " +
+        "fábrica e reativação resolvem isso.",
+    );
+
+  // Evita empilhar o mesmo comando por cliques repetidos.
+  const { data: pending } = await db
+    .from("device_commands")
+    .select("id")
+    .eq("device_id", p.deviceId)
+    .eq("kind", p.kind)
+    .is("delivered_at", null)
+    .limit(1);
+  if (pending && pending.length > 0)
+    throw new AppError("Esse comando já foi enviado e está aguardando o aparelho buscar.");
+
+  const { data: command, error } = await db
+    .from("device_commands")
+    .insert({ device_id: p.deviceId, kind: p.kind, requested_by_user_id: userId })
+    .select("id")
+    .single();
+  if (error) throw new AppError(error.message);
+
+  await logAudit(db, {
+    event_type: "comando_enviado",
+    device_id: p.deviceId,
+    user_id: userId,
+    details: { kind: p.kind },
+  });
+
+  return { ok: true as const, commandId: command.id as string };
+}
+
+// ---- Espelhamento, lado painel (dono ou TI) ------------------------------
+
+async function getDeviceFrameUrl(db: ReturnType<typeof admin>, p: { deviceId: string }) {
+  const { data: signed, error } = await db.storage
+    .from("device-frames")
+    .createSignedUrl(`${p.deviceId}.jpg`, 10);
+  if (error || !signed) return { found: false as const, url: null };
+  return { found: true as const, url: signed.signedUrl as string };
+}
+
+async function sendDeviceInput(
+  db: ReturnType<typeof admin>,
+  p: {
+    deviceId: string;
+    kind: "tap" | "swipe";
+    x: number;
+    y: number;
+    x2?: number;
+    y2?: number;
+    durationMs?: number;
+  },
+) {
+  const { data: session } = await db
+    .from("access_sessions")
+    .select("id")
+    .eq("device_id", p.deviceId)
+    .eq("status", "ativa")
+    .eq("mode", "controle")
+    .maybeSingle();
+  if (!session)
+    throw new AppError("Não há sessão em modo controle ativa para este aparelho no momento.");
+
+  const { error } = await db.from("session_inputs").insert({
+    session_id: session.id,
+    device_id: p.deviceId,
+    kind: p.kind,
+    x: p.x,
+    y: p.y,
+    x2: p.x2 ?? null,
+    y2: p.y2 ?? null,
+    duration_ms: p.durationMs ?? null,
+  });
+  if (error) throw new AppError(error.message);
+  return { ok: true as const };
+}
+
+// ---- Android Enterprise, só banco (TI) -----------------------------------
+// As chamadas ao Google continuam no servidor Nitro (android-management.server);
+// aqui ficam só as leituras/escritas no banco, que precisam de service_role.
+
+async function getEnterpriseConfig(db: ReturnType<typeof admin>) {
+  const { data } = await db
+    .from("enterprise_config")
+    .select("enterprise_name, default_policy_name, pending_state, pending_signup_url_name")
+    .eq("id", true)
+    .maybeSingle();
+  return {
+    enterpriseName: data?.enterprise_name ?? null,
+    defaultPolicyName: data?.default_policy_name ?? null,
+    pendingState: data?.pending_state ?? null,
+    pendingSignupUrlName: data?.pending_signup_url_name ?? null,
+  };
+}
+
+async function saveEnterprisePending(
+  db: ReturnType<typeof admin>,
+  p: { state: string; signupUrlName: string },
+) {
+  const { error } = await db.from("enterprise_config").upsert({
+    id: true,
+    pending_state: p.state,
+    pending_signup_url_name: p.signupUrlName,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw new AppError(error.message);
+  return { ok: true as const };
+}
+
+async function saveEnterpriseConfigured(
+  db: ReturnType<typeof admin>,
+  p: { enterpriseName: string; policyName: string },
+) {
+  const { error } = await db.from("enterprise_config").upsert({
+    id: true,
+    enterprise_name: p.enterpriseName,
+    default_policy_name: p.policyName,
+    pending_state: null,
+    pending_signup_url_name: null,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw new AppError(error.message);
+  return { ok: true as const };
+}
+
+async function getDeviceStatus(db: ReturnType<typeof admin>, p: { deviceId: string }) {
+  const { data: device } = await db
+    .from("devices")
+    .select("id, enrollment_status")
+    .eq("id", p.deviceId)
+    .maybeSingle();
+  if (!device) throw new AppError("Aparelho não encontrado.");
+  return { enrollmentStatus: device.enrollment_status as string };
+}
+
+async function saveDeviceQr(
+  db: ReturnType<typeof admin>,
+  p: {
+    deviceId: string;
+    tokenName: string;
+    tokenValue: string;
+    qrPng: string;
+    expiresAt: string;
+  },
+) {
+  const { error } = await db
+    .from("devices")
+    .update({
+      android_enrollment_token_name: p.tokenName,
+      android_enrollment_token_value: p.tokenValue,
+      android_enrollment_qr_png: p.qrPng,
+      android_enrollment_expires_at: p.expiresAt,
+    })
+    .eq("id", p.deviceId);
+  if (error) throw new AppError(error.message);
+  return { ok: true as const };
+}
+
 // ---- Roteador ------------------------------------------------------------
 
 Deno.serve(async (req) => {
@@ -304,6 +512,38 @@ Deno.serve(async (req) => {
       case "endSession": {
         const userId = await requireTi(db, authHeader);
         return json({ data: await endSession(db, userId, payload as any) });
+      }
+      case "issueDeviceCommand": {
+        const userId = await requireTi(db, authHeader);
+        return json({ data: await issueDeviceCommand(db, userId, payload as any) });
+      }
+      case "getDeviceFrameUrl": {
+        await requireDeviceOwnerOrTi(db, authHeader, (payload as any).deviceId);
+        return json({ data: await getDeviceFrameUrl(db, payload as any) });
+      }
+      case "sendDeviceInput": {
+        await requireDeviceOwnerOrTi(db, authHeader, (payload as any).deviceId);
+        return json({ data: await sendDeviceInput(db, payload as any) });
+      }
+      case "getEnterpriseConfig": {
+        await requireTi(db, authHeader);
+        return json({ data: await getEnterpriseConfig(db) });
+      }
+      case "saveEnterprisePending": {
+        await requireTi(db, authHeader);
+        return json({ data: await saveEnterprisePending(db, payload as any) });
+      }
+      case "saveEnterpriseConfigured": {
+        await requireTi(db, authHeader);
+        return json({ data: await saveEnterpriseConfigured(db, payload as any) });
+      }
+      case "getDeviceStatus": {
+        await requireTi(db, authHeader);
+        return json({ data: await getDeviceStatus(db, payload as any) });
+      }
+      case "saveDeviceQr": {
+        await requireTi(db, authHeader);
+        return json({ data: await saveDeviceQr(db, payload as any) });
       }
       default:
         return json({ error: `Ação desconhecida: ${action}` }, 400);

@@ -5,30 +5,19 @@ import { z } from "zod";
  * GET: o app pergunta se existe uma sessão de acesso ativa (o que dispara a
  * notificação de consentimento na tela do aparelho).
  * POST: o app encerra a sessão ativa quando a pessoa cancela no celular.
+ *
+ * Autenticado por x-device-id / x-device-secret, validados na Edge Function
+ * "gateway-agent" (decisão de 24/10/2026); aqui só repassamos.
  */
 export const Route = createFileRoute("/api/public/agent/session")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { supabaseAdmin, json, authenticateDevice } = await import("@/lib/agent.server");
-        const device = await authenticateDevice(request);
-        if (!device) return json({ error: "Aparelho não autorizado" }, 401);
-
-        const { data: session } = await supabaseAdmin
-          .from("access_sessions")
-          .select("id, mode, reason, started_at")
-          .eq("device_id", device.id)
-          .eq("status", "ativa")
-          .maybeSingle();
-
-        return json({ activeSession: session ?? null });
+        const { callAgentGateway } = await import("@/lib/backend/gateway.server");
+        return callAgentGateway(request, "getSession", {});
       },
       POST: async ({ request }) => {
-        const { supabaseAdmin, json, authenticateDevice, logAgentEvent } = await import(
-          "@/lib/agent.server"
-        );
-        const device = await authenticateDevice(request);
-        if (!device) return json({ error: "Aparelho não autorizado" }, 401);
+        const { callAgentGateway } = await import("@/lib/backend/gateway.server");
 
         let body: unknown = {};
         try {
@@ -37,29 +26,13 @@ export const Route = createFileRoute("/api/public/agent/session")({
           body = {};
         }
         const parsed = z.object({ action: z.literal("encerrar") }).safeParse(body);
-        if (!parsed.success) return json({ error: "Ação inválida" }, 400);
+        if (!parsed.success)
+          return new Response(JSON.stringify({ error: "Ação inválida" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=utf-8" },
+          });
 
-        const { data: session } = await supabaseAdmin
-          .from("access_sessions")
-          .select("id")
-          .eq("device_id", device.id)
-          .eq("status", "ativa")
-          .maybeSingle();
-        if (!session) return json({ ok: true, encerrada: false });
-
-        await supabaseAdmin
-          .from("access_sessions")
-          .update({ status: "encerrada", ended_at: new Date().toISOString() })
-          .eq("id", session.id);
-
-        await logAgentEvent({
-          event_type: "sessao_encerrada",
-          device_id: device.id,
-          session_id: session.id,
-          details: { origem: "app_android" },
-        });
-
-        return json({ ok: true, encerrada: true });
+        return callAgentGateway(request, "endSession", {});
       },
     },
   },

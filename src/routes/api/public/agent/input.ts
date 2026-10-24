@@ -11,43 +11,16 @@ import { createFileRoute } from "@tanstack/react-router";
  * painel) porque o painel não sabe a resolução real do aparelho - quem
  * converte para pixel é o app, usando devices.screen_width/height
  * reportado no enrollment.
+ *
+ * Autenticado por x-device-id / x-device-secret na Edge Function
+ * "gateway-agent" (decisão de 24/10/2026); aqui só repassamos.
  */
 export const Route = createFileRoute("/api/public/agent/input")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { supabaseAdmin, json, authenticateDevice } = await import("@/lib/agent.server");
-        const device = await authenticateDevice(request);
-        if (!device) return json({ error: "Aparelho não autorizado" }, 401);
-
-        const { data: pending } = await supabaseAdmin
-          .from("session_inputs")
-          .select("id, kind, x, y, x2, y2, duration_ms")
-          .eq("device_id", device.id)
-          .is("delivered_at", null)
-          .order("created_at", { ascending: true })
-          .limit(20);
-
-        if (pending && pending.length > 0) {
-          await supabaseAdmin
-            .from("session_inputs")
-            .update({ delivered_at: new Date().toISOString() })
-            .in(
-              "id",
-              pending.map((p) => p.id),
-            );
-        }
-
-        return json({
-          inputs: (pending ?? []).map((p) => ({
-            kind: p.kind,
-            x: p.x,
-            y: p.y,
-            x2: p.x2,
-            y2: p.y2,
-            durationMs: p.duration_ms,
-          })),
-        });
+        const { callAgentGateway } = await import("@/lib/backend/gateway.server");
+        return callAgentGateway(request, "getInputs", {});
       },
     },
   },

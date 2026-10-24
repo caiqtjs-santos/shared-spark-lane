@@ -1,15 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
-/** O app informa que está vivo, com nível de bateria e token de notificação. */
+/**
+ * O app informa que está vivo, com nível de bateria e token de notificação.
+ * Autenticado por x-device-id / x-device-secret, validados na Edge Function
+ * "gateway-agent" (decisão de 24/10/2026); aqui só validamos a entrada.
+ */
 export const Route = createFileRoute("/api/public/agent/heartbeat")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const { supabaseAdmin, json, authenticateDevice } = await import("@/lib/agent.server");
-
-        const device = await authenticateDevice(request);
-        if (!device) return json({ error: "Aparelho não autorizado" }, 401);
+        const { callAgentGateway } = await import("@/lib/backend/gateway.server");
 
         let body: unknown = {};
         try {
@@ -28,23 +29,13 @@ export const Route = createFileRoute("/api/public/agent/heartbeat")({
             screenHeight: z.number().int().positive().max(20000).optional(),
           })
           .safeParse(body);
-        if (!parsed.success) return json({ error: "Dados inválidos" }, 400);
+        if (!parsed.success)
+          return new Response(JSON.stringify({ error: "Dados inválidos" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=utf-8" },
+          });
 
-        const { error } = await supabaseAdmin
-          .from("devices")
-          .update({
-            last_seen_at: new Date().toISOString(),
-            ...(parsed.data.batteryLevel != null
-              ? { battery_level: parsed.data.batteryLevel }
-              : {}),
-            ...(parsed.data.pushToken ? { push_token: parsed.data.pushToken } : {}),
-            ...(parsed.data.screenWidth ? { screen_width: parsed.data.screenWidth } : {}),
-            ...(parsed.data.screenHeight ? { screen_height: parsed.data.screenHeight } : {}),
-          })
-          .eq("id", device.id);
-        if (error) return json({ error: error.message }, 500);
-
-        return json({ ok: true });
+        return callAgentGateway(request, "heartbeat", parsed.data);
       },
     },
   },

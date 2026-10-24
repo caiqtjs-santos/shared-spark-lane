@@ -11,8 +11,11 @@
  *  - Os dois valores abaixo são públicos por natureza (vão para o navegador
  *    de qualquer jeito); quem protege os dados é o RLS, não o sigilo deles.
  *
- * A chave SECRETA (service_role) nunca fica no código: vem do segredo
- * `MEUCELULAR_SERVICE_ROLE_KEY`, cadastrado no Lovable (ver admin.server.ts).
+ * A chave SECRETA (service_role) não vive mais no servidor do site: as
+ * operações privilegiadas rodam nas Edge Functions do Supabase (gateway,
+ * gateway-link, gateway-agent), onde o próprio Supabase injeta a chave
+ * automaticamente (decisão de 24/10/2026, ver roadmap.md). Fim do segredo
+ * manual `MEUCELULAR_SERVICE_ROLE_KEY` do Lovable.
  */
 export const BACKEND_URL = "https://brazmbstdzinxgdydxlk.supabase.co";
 export const BACKEND_PUBLISHABLE_KEY = "sb_publishable_DHuxuBAhfcbdb0nHkMEwUA_0cdwSCUd";

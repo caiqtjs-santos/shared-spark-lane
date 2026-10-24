@@ -10,22 +10,26 @@ import { z } from "zod";
  *
  * Só aceita frame quando existe sessão ativa para o aparelho - fora de
  * sessão, o app nem deveria estar chamando isso (ver SessionWatcherService),
- * mas a checagem aqui evita gravar lixo no Storage em qualquer cenário de
- * app desatualizado/bug.
+ * mas a checagem (na Edge Function) evita gravar lixo no Storage em qualquer
+ * cenário de app desatualizado/bug.
+ *
+ * Autenticado por x-device-id / x-device-secret na Edge Function
+ * "gateway-agent" (decisão de 24/10/2026); aqui só validamos a entrada.
  */
 export const Route = createFileRoute("/api/public/agent/frame")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const { supabaseAdmin, json, authenticateDevice } = await import("@/lib/agent.server");
-        const device = await authenticateDevice(request);
-        if (!device) return json({ error: "Aparelho não autorizado" }, 401);
+        const { callAgentGateway } = await import("@/lib/backend/gateway.server");
 
         let body: unknown;
         try {
           body = await request.json();
         } catch {
-          return json({ error: "Corpo inválido" }, 400);
+          return new Response(JSON.stringify({ error: "Corpo inválido" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=utf-8" },
+          });
         }
 
         const parsed = z
@@ -34,31 +38,13 @@ export const Route = createFileRoute("/api/public/agent/frame")({
             frameBase64: z.string().min(100),
           })
           .safeParse(body);
-        if (!parsed.success) return json({ error: "Dados inválidos" }, 400);
+        if (!parsed.success)
+          return new Response(JSON.stringify({ error: "Dados inválidos" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=utf-8" },
+          });
 
-        const { data: session } = await supabaseAdmin
-          .from("access_sessions")
-          .select("id")
-          .eq("device_id", device.id)
-          .eq("status", "ativa")
-          .maybeSingle();
-        if (!session) return json({ ok: true, active: false });
-
-        let bytes: Uint8Array;
-        try {
-          const binary = atob(parsed.data.frameBase64);
-          bytes = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        } catch {
-          return json({ error: "frameBase64 não é base64 válido" }, 400);
-        }
-
-        const { error } = await supabaseAdmin.storage
-          .from("device-frames")
-          .upload(`${device.id}.jpg`, bytes, { contentType: "image/jpeg", upsert: true });
-        if (error) return json({ error: error.message }, 500);
-
-        return json({ ok: true, active: true });
+        return callAgentGateway(request, "postFrame", parsed.data);
       },
     },
   },

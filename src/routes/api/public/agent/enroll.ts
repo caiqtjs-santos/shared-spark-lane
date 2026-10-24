@@ -5,23 +5,29 @@ import { z } from "zod";
  * O app Android troca o token de ativação por um segredo permanente do
  * aparelho. Corresponde ao "único aceite" do onboarding.
  *
- * O token NÃO é apagado aqui: depois da ativação ele continua sendo o link
+ * O token NÃO é apagado: depois da ativação ele continua sendo o link
  * permanente do profissional (/instalar/<token> abre o painel de acesso
  * remoto - decisão de 20/10/2026). Para esse link não virar uma forma de
  * roubar o aparelho, a troca por device_secret só vale UMA vez: com o
  * aparelho já ativo, um novo enrollment é recusado.
+ *
+ * A gravação privilegiada roda na Edge Function "gateway-agent" (decisão de
+ * 24/10/2026): aqui só validamos a entrada e repassamos.
  */
 export const Route = createFileRoute("/api/public/agent/enroll")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const { supabaseAdmin, json, logAgentEvent } = await import("@/lib/agent.server");
+        const { callAgentGateway } = await import("@/lib/backend/gateway.server");
 
         let body: unknown;
         try {
           body = await request.json();
         } catch {
-          return json({ error: "Corpo inválido" }, 400);
+          return new Response(JSON.stringify({ error: "Corpo inválido" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=utf-8" },
+          });
         }
 
         const parsed = z
@@ -43,44 +49,13 @@ export const Route = createFileRoute("/api/public/agent/enroll")({
             deviceOwner: z.boolean().optional(),
           })
           .safeParse(body);
-        if (!parsed.success) return json({ error: "Dados inválidos" }, 400);
+        if (!parsed.success)
+          return new Response(JSON.stringify({ error: "Dados inválidos" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=utf-8" },
+          });
 
-        const { data: device } = await supabaseAdmin
-          .from("devices")
-          .select("id, enrollment_status")
-          .eq("enrollment_token", parsed.data.enrollmentToken)
-          .maybeSingle();
-        if (!device) return json({ error: "Token de ativação inválido" }, 404);
-        if (device.enrollment_status === "revogado")
-          return json({ error: "Aparelho revogado" }, 403);
-        if (device.enrollment_status !== "pendente")
-          return json({ error: "Este aparelho já foi ativado" }, 409);
-
-        const deviceSecret = `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, "");
-
-        const { error } = await supabaseAdmin
-          .from("devices")
-          .update({
-            enrollment_status: "ativo",
-            enrolled_at: new Date().toISOString(),
-            device_secret: deviceSecret,
-            last_seen_at: new Date().toISOString(),
-            ...(parsed.data.model ? { model: parsed.data.model } : {}),
-            ...(parsed.data.pushToken ? { push_token: parsed.data.pushToken } : {}),
-            ...(parsed.data.screenWidth ? { screen_width: parsed.data.screenWidth } : {}),
-            ...(parsed.data.screenHeight ? { screen_height: parsed.data.screenHeight } : {}),
-            device_owner: parsed.data.deviceOwner === true,
-          })
-          .eq("id", device.id);
-        if (error) return json({ error: error.message }, 500);
-
-        await logAgentEvent({
-          event_type: "enrollment_concluido",
-          device_id: device.id,
-          details: { origem: "app_android" },
-        });
-
-        return json({ deviceId: device.id, deviceSecret });
+        return callAgentGateway(request, "enroll", parsed.data);
       },
     },
   },

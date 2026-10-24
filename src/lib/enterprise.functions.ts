@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/lib/backend/auth-middleware";
+import { callGateway } from "@/lib/backend/gateway.server";
 import { z } from "zod";
 import {
   createSignupUrl,
@@ -8,6 +9,16 @@ import {
   createEnrollmentToken,
   diagnoseCredentials,
 } from "./android-management.server";
+
+/**
+ * Android Enterprise (caminho avançado de provisionamento por QR). As
+ * chamadas ao Google (criar enterprise, política, token de matrícula)
+ * continuam rodando aqui no servidor Nitro, pois usam as credenciais do
+ * Google (ANDROID_MANAGEMENT_SA_JSON / GOOGLE_CLOUD_PROJECT_ID). Só o acesso
+ * ao banco (ler/gravar enterprise_config e devices) foi para a Edge Function
+ * "gateway" (decisão de 24/10/2026), para não depender mais do segredo
+ * service_role manual do Lovable.
+ */
 
 function parseInput<T extends z.ZodTypeAny>(schema: T, input: unknown): z.infer<T> {
   const result = schema.safeParse(input);
@@ -18,11 +29,19 @@ function parseInput<T extends z.ZodTypeAny>(schema: T, input: unknown): z.infer<
   return result.data;
 }
 
-async function admin() {
-  const { supabaseAdmin } = await import("@/lib/backend/admin.server");
-  return supabaseAdmin;
-}
+type EnterpriseConfig = {
+  enterpriseName: string | null;
+  defaultPolicyName: string | null;
+  pendingState: string | null;
+  pendingSignupUrlName: string | null;
+};
 
+/**
+ * Pré-checagem rápida de papel TI feita com o cliente autenticado (RLS). É
+ * só um atalho para falhar cedo (e não disparar chamada ao Google por quem
+ * não é TI); a Edge Function "gateway" revalida o papel em cada operação de
+ * banco.
+ */
 async function requireTi(context: { supabase: any; userId: string }) {
   const { data } = await context.supabase.rpc("has_role", {
     _user_id: context.userId,
@@ -36,16 +55,10 @@ export const getEnterpriseStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await requireTi(context);
-    const db = await admin();
-    const { data } = await db
-      .from("enterprise_config")
-      .select("enterprise_name, default_policy_name")
-      .eq("id", true)
-      .maybeSingle();
-
+    const config = await callGateway<EnterpriseConfig>("getEnterpriseConfig", {}, { forwardAuth: true });
     return {
-      configured: Boolean(data?.enterprise_name && data?.default_policy_name),
-      enterpriseName: data?.enterprise_name ?? null,
+      configured: Boolean(config.enterpriseName && config.defaultPolicyName),
+      enterpriseName: config.enterpriseName,
     };
   });
 
@@ -75,19 +88,16 @@ export const startEnterpriseSignup = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireTi(context);
-    const db = await admin();
 
     const state = crypto.randomUUID();
     const callbackUrl = `${data.callbackBaseUrl.replace(/\/$/, "")}/ti/enterprise-callback?state=${state}`;
     const signup = await createSignupUrl(callbackUrl);
 
-    const { error } = await db.from("enterprise_config").upsert({
-      id: true,
-      pending_state: state,
-      pending_signup_url_name: signup.name,
-      updated_at: new Date().toISOString(),
-    });
-    if (error) throw new Error(error.message);
+    await callGateway(
+      "saveEnterprisePending",
+      { state, signupUrlName: signup.name },
+      { forwardAuth: true },
+    );
 
     return { url: signup.url };
   });
@@ -111,40 +121,31 @@ export const completeEnterpriseSignupFn = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireTi(context);
-    const db = await admin();
 
-    const { data: config } = await db
-      .from("enterprise_config")
-      .select("pending_state, pending_signup_url_name")
-      .eq("id", true)
-      .maybeSingle();
+    const config = await callGateway<EnterpriseConfig>("getEnterpriseConfig", {}, { forwardAuth: true });
 
-    if (!config?.pending_state || config.pending_state !== data.state) {
+    if (!config.pendingState || config.pendingState !== data.state) {
       throw new Error(
         "Este retorno não corresponde a um cadastro em andamento (state não confere). Inicie o cadastro novamente.",
       );
     }
-    if (!config.pending_signup_url_name) {
+    if (!config.pendingSignupUrlName) {
       throw new Error("Cadastro em andamento sem signupUrlName registrado - inicie de novo.");
     }
 
     const enterprise = await completeEnterpriseSignup({
-      signupUrlName: config.pending_signup_url_name,
+      signupUrlName: config.pendingSignupUrlName,
       enterpriseToken: data.enterpriseToken,
       displayName: "Meu Celular",
     });
 
     const policy = await ensureDefaultPolicy(enterprise.name);
 
-    const { error } = await db.from("enterprise_config").upsert({
-      id: true,
-      enterprise_name: enterprise.name,
-      default_policy_name: policy.name,
-      pending_state: null,
-      pending_signup_url_name: null,
-      updated_at: new Date().toISOString(),
-    });
-    if (error) throw new Error(error.message);
+    await callGateway(
+      "saveEnterpriseConfigured",
+      { enterpriseName: enterprise.name, policyName: policy.name },
+      { forwardAuth: true },
+    );
 
     return { enterpriseName: enterprise.name as string };
   });
@@ -161,43 +162,35 @@ export const createDeviceQrProvisioning = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireTi(context);
-    const db = await admin();
 
-    const { data: config } = await db
-      .from("enterprise_config")
-      .select("enterprise_name, default_policy_name")
-      .eq("id", true)
-      .maybeSingle();
-    if (!config?.enterprise_name || !config?.default_policy_name) {
+    const config = await callGateway<EnterpriseConfig>("getEnterpriseConfig", {}, { forwardAuth: true });
+    if (!config.enterpriseName || !config.defaultPolicyName) {
       throw new Error("Configure o Android Enterprise antes de gerar um QR de provisionamento.");
     }
 
-    const { data: device } = await db
-      .from("devices")
-      .select("id, enrollment_status")
-      .eq("id", data.deviceId)
-      .maybeSingle();
-    if (!device) throw new Error("Aparelho não encontrado.");
+    // Confere que o aparelho existe (a função lança se não existir).
+    await callGateway("getDeviceStatus", { deviceId: data.deviceId }, { forwardAuth: true });
 
     const token = await createEnrollmentToken({
-      enterpriseName: config.enterprise_name,
-      policyName: config.default_policy_name,
+      enterpriseName: config.enterpriseName,
+      policyName: config.defaultPolicyName,
       deviceId: data.deviceId,
       // 1 hora é suficiente para o TI provisionar o aparelho na hora; gerar
       // de novo é rápido caso expire.
       durationSeconds: 3600,
     });
 
-    const { error } = await db
-      .from("devices")
-      .update({
-        android_enrollment_token_name: token.name,
-        android_enrollment_token_value: token.value,
-        android_enrollment_qr_png: token.qrCodePngBase64,
-        android_enrollment_expires_at: token.expirationTimestamp,
-      })
-      .eq("id", data.deviceId);
-    if (error) throw new Error(error.message);
+    await callGateway(
+      "saveDeviceQr",
+      {
+        deviceId: data.deviceId,
+        tokenName: token.name,
+        tokenValue: token.value,
+        qrPng: token.qrCodePngBase64,
+        expiresAt: token.expirationTimestamp,
+      },
+      { forwardAuth: true },
+    );
 
     return {
       qrCodePngBase64: token.qrCodePngBase64,
