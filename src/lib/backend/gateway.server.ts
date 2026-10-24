@@ -12,12 +12,12 @@ import { BACKEND_PUBLISHABLE_KEY, BACKEND_URL } from "./config";
  * A função faz a própria autenticação: ações do TI exigem o JWT do usuário,
  * encaminhado aqui com `forwardAuth`.
  */
-const GATEWAY_URL = `${BACKEND_URL}/functions/v1/gateway`;
-
 export async function callGateway<T = unknown>(
   action: string,
   payload: Record<string, unknown>,
-  opts: { forwardAuth?: boolean } = {},
+  // `fn`: "gateway" (operações do TI, exigem JWT) ou "gateway-link" (caminho
+  // do profissional, autenticado pelo token no próprio payload).
+  opts: { forwardAuth?: boolean; fn?: "gateway" | "gateway-link" } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {
     "content-type": "application/json",
@@ -32,7 +32,7 @@ export async function callGateway<T = unknown>(
 
   let res: Response;
   try {
-    res = await fetch(GATEWAY_URL, {
+    res = await fetch(`${BACKEND_URL}/functions/v1/${opts.fn ?? "gateway"}`, {
       method: "POST",
       headers,
       body: JSON.stringify({ action, payload }),
