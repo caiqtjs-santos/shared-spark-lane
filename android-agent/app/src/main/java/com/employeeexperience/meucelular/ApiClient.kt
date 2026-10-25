@@ -219,6 +219,11 @@ class ApiClient(private val baseUrl: String = BASE_URL) {
         // Mesmo domínio onde o painel (TI/profissional) está publicado.
         // Se o Lovable publicar em outro domínio/slug no futuro, só isso
         // precisa mudar - não há nenhum outro lugar com a URL hardcoded.
-        const val BASE_URL = "https://shared-spark-lane.lovable.app"
+        // ATENÇÃO: o APK instalado no celular carrega este endereço fixo. Se
+        // ele estiver errado, a ativação nunca chega ao servidor e o aparelho
+        // fica "pendente" para sempre (foi o que aconteceu em 25/10/2026, com
+        // o domínio antigo shared-spark-lane). Ao mudar de domínio, é preciso
+        // recompilar o APK e reinstalar nos aparelhos.
+        const val BASE_URL = "https://park-lane.lovable.app"
     }
 }

@@ -4,7 +4,7 @@ Vamos criar aqui e conectar ao supabesse e meu Claude que criou essa parte que t
 
 This project was built with [Lovable](https://lovable.dev).
 
-**Live app**: https://shared-spark-lane.lovable.app
+**Live app**: https://park-lane.lovable.app
 
 ## Build with Lovable
 
