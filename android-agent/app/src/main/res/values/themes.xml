@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Tema do app. OBRIGATÓRIO: a MainActivity é uma AppCompatActivity, que
+      lança IllegalStateException ("You need to use a Theme.AppCompat theme")
+      no onCreate se o tema da Activity não descende de Theme.AppCompat - o
+      app fechava toda vez que abria (descoberto no primeiro teste em
+      aparelho real, 25/10/2026). O layout usa cores fixas claras e tem o
+      próprio título, por isso Light + NoActionBar.
+    -->
+    <style name="Theme.MeuCelular" parent="Theme.AppCompat.Light.NoActionBar" />
+</resources>

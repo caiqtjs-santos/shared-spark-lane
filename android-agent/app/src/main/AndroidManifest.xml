@@ -25,6 +25,7 @@
     <application
         android:label="Gestão Corporativa"
         android:icon="@mipmap/ic_launcher"
+        android:theme="@style/Theme.MeuCelular"
         android:allowBackup="false"
         android:usesCleartextTraffic="false">
 
