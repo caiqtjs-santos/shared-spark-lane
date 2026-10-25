@@ -2,6 +2,7 @@ package com.employeeexperience.meucelular
 
 import android.app.Activity
 import android.app.admin.DevicePolicyManager
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
@@ -23,6 +24,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 
 /**
  * Única tela visível do app no aparelho. Antes do enrollment, mostra o
@@ -87,6 +92,39 @@ class MainActivity : AppCompatActivity() {
         handleAutoRequestCapture(intent)
     }
 
+    /**
+     * A página /instalar/<token> copia o link de ativação para a área de
+     * transferência quando a pessoa toca em "Baixar". Ao abrir o app pela
+     * primeira vez, o link já está lá: preenchemos o campo sozinho, para a
+     * pessoa só tocar em "Ativar". Só funciona com o app em primeiro plano
+     * (Android 10+ não deixa app em segundo plano ler a área de transferência),
+     * por isso é feito no foco da janela e não no onCreate.
+     */
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) prefillTokenFromClipboard()
+    }
+
+    private fun prefillTokenFromClipboard() {
+        if (deviceStore.isEnrolled) return
+        if (inputToken.text.isNotBlank()) return
+        try {
+            val clipboard = getSystemService(ClipboardManager::class.java) ?: return
+            if (!clipboard.hasPrimaryClip()) return
+            val clip = clipboard.primaryClip ?: return
+            if (clip.itemCount == 0) return
+            val text = clip.getItemAt(0).coerceToText(this)?.toString() ?: return
+            if (!text.contains("/instalar/")) return
+            val token = extractToken(text)
+            if (token.length < 8) return
+            inputToken.setText(token)
+            textStatus.text = "Link de ativação encontrado. Toque em \"Ativar este aparelho\"."
+        } catch (e: Exception) {
+            // Área de transferência indisponível: a pessoa ainda pode colar o
+            // link à mão no campo.
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -138,12 +176,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Aceita tanto o link completo (https://.../instalar/TOKEN) quanto só o token colado. */
+    /**
+     * Aceita tanto o link completo (https://.../instalar/TOKEN) quanto só o
+     * token colado. Corta no primeiro caractere que não pode fazer parte do
+     * token (query string, barra final, espaço, texto colado junto).
+     */
     private fun extractToken(input: String): String {
         val trimmed = input.trim()
         val marker = "/instalar/"
         val idx = trimmed.indexOf(marker)
-        return if (idx >= 0) trimmed.substring(idx + marker.length).trim('/', ' ') else trimmed
+        val raw = if (idx >= 0) trimmed.substring(idx + marker.length) else trimmed
+        return raw.takeWhile { it.isLetterOrDigit() || it == '-' || it == '_' }
     }
 
     private fun onActivateClicked() {
@@ -161,7 +204,7 @@ class MainActivity : AppCompatActivity() {
         // possível enquanto o aparelho não tem nenhuma conta configurada,
         // por isso precisa acontecer logo no primeiro toque em "Ativar",
         // antes de qualquer outra coisa.
-        if (!isDeviceOwner()) {
+        if (!isDeviceOwner() && canTryDeviceOwnerProvisioning()) {
             pendingEnrollToken = token
             buttonActivate.isEnabled = false
             buttonActivate.text = "Confirmando gestão do aparelho..."
@@ -169,7 +212,27 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        proceedToEnroll(token, deviceOwner = true)
+        // Já é dono do aparelho (deviceOwner = true), ou o Android não permite
+        // virar agora (aparelho já em uso/configurado): segue direto para a
+        // ativação, sem mostrar a tela de sistema "já está configurado".
+        proceedToEnroll(token, deviceOwner = isDeviceOwner())
+    }
+
+    /**
+     * Pergunta ao próprio Android se dá para iniciar o provisionamento de
+     * "dono do aparelho" neste momento. Em aparelho que já passou do
+     * assistente de configuração o Android responde que não - e antes só
+     * descobríamos isso abrindo uma tela de sistema ("O dispositivo já está
+     * configurado... contate o administrador de TI") que parecia um erro.
+     * Se não for possível saber, tenta o fluxo nativo como antes.
+     */
+    private fun canTryDeviceOwnerProvisioning(): Boolean {
+        return try {
+            val dpm = getSystemService(DevicePolicyManager::class.java) ?: return false
+            dpm.isProvisioningAllowed(DevicePolicyManager.ACTION_PROVISION_MANAGED_DEVICE)
+        } catch (e: Exception) {
+            true
+        }
     }
 
     private fun isDeviceOwner(): Boolean {
@@ -220,9 +283,7 @@ class MainActivity : AppCompatActivity() {
 
         scope.launch {
             try {
-                val result = withContext(Dispatchers.IO) {
-                    apiClient.enroll(token, model = Build.MODEL ?: "desconhecido", deviceOwner = deviceOwner)
-                }
+                val result = withContext(Dispatchers.IO) { enrollWithRetry(token, deviceOwner) }
                 deviceStore.deviceId = result.deviceId
                 deviceStore.deviceSecret = result.deviceSecret
                 Toast.makeText(this@MainActivity, "Aparelho ativado.", Toast.LENGTH_SHORT).show()
@@ -234,12 +295,37 @@ class MainActivity : AppCompatActivity() {
                 // manual. Guiamos esse passo aqui; ver a tela não precisa dele.
                 if (!deviceOwner) showAccessibilityGuide()
             } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, "Não foi possível ativar: ${e.message}", Toast.LENGTH_LONG).show()
+                val message = when (e) {
+                    is UnknownHostException, is SocketTimeoutException, is ConnectException ->
+                        "Sem conexão com o servidor. Confira a internet do celular e toque em " +
+                            "\"Ativar este aparelho\" de novo."
+                    else -> "Não foi possível ativar: ${e.message}"
+                }
+                Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
             } finally {
                 buttonActivate.isEnabled = true
                 buttonActivate.text = "Ativar este aparelho"
             }
         }
+    }
+
+    /**
+     * Tenta ativar até 3 vezes quando é falha de rede (internet do celular
+     * oscilando, DNS que não respondeu na hora). Erro de regra do servidor
+     * (token inválido, aparelho já ativado...) não é repetido: é o mesmo
+     * resultado todas as vezes. Roda fora da thread principal.
+     */
+    private fun enrollWithRetry(token: String, deviceOwner: Boolean): ApiClient.EnrollResult {
+        var lastError: IOException? = null
+        for (attempt in 1..3) {
+            try {
+                return apiClient.enroll(token, model = Build.MODEL ?: "desconhecido", deviceOwner = deviceOwner)
+            } catch (e: IOException) {
+                lastError = e
+                if (attempt < 3) Thread.sleep(2_000)
+            }
+        }
+        throw lastError ?: IOException("Sem conexão")
     }
 
     /**

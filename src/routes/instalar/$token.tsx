@@ -124,6 +124,22 @@ function InstalarPage() {
     });
   }
 
+  // Ao tocar em "Baixar", copia o link de ativação para a área de
+  // transferência. O app, ao abrir pela primeira vez, lê esse link e já vem com
+  // o campo preenchido - a pessoa não precisa copiar/colar nada à mão. Precisa
+  // rodar dentro do clique (gesto do usuário) para o navegador permitir.
+  function copyActivationLink() {
+    try {
+      navigator.clipboard
+        ?.writeText(`${window.location.origin}/instalar/${token}`)
+        .catch(() => {
+          // Sem permissão de área de transferência: o app ainda aceita colar à mão.
+        });
+    } catch {
+      // Navegador sem API de área de transferência: idem.
+    }
+  }
+
   // Abrir o app já instalado (passando o token direto) - SÓ por toque do
   // usuário, nunca automático. A abertura automática no carregamento era o que
   // causava o laço: quando o app não está instalado, o Android cai no
@@ -285,9 +301,9 @@ function InstalarPage() {
                       fora da Play Store — é esperado, e só precisa autorizar uma vez).
                     </li>
                     <li>
-                      3. Depois de instalado, toque neste mesmo link de novo (ex: na notificação de
-                      download): o app abre, pede uma única confirmação para gerenciar o aparelho e já
-                      fica ativado — e este link vira o acesso remoto ao aparelho.
+                      3. Abra o app: o link de ativação já vem preenchido (foi copiado quando você
+                      baixou). Toque em "Ativar este aparelho". Se o Android pedir confirmação para
+                      gerenciar o aparelho, aceite — e este link vira o acesso remoto.
                     </li>
                   </ol>
                 </>
@@ -307,8 +323,9 @@ function InstalarPage() {
                       fora da Play Store — é esperado, e só precisa autorizar uma vez).
                     </li>
                     <li>
-                      3. Abra o app e toque em ativar. Como o celular já está em uso, ele é ativado
-                      sem virar "dono do aparelho" — e este link vira o acesso remoto.
+                      3. Abra o app: o link de ativação já vem preenchido (foi copiado quando você
+                      baixou). Toque em "Ativar este aparelho". Como o celular já está em uso, ele é
+                      ativado sem virar "dono do aparelho" — e este link vira o acesso remoto.
                     </li>
                     <li>
                       4. Para <strong>controlar</strong> a tela (não só ver), o próprio app vai te
@@ -334,7 +351,7 @@ function InstalarPage() {
                 </span>
               </label>
               {accepted ? (
-                <a href={APK_URL} download>
+                <a href={APK_URL} download onClick={copyActivationLink}>
                   <Button className="mt-4 w-full">Baixar e ativar app de gestão</Button>
                 </a>
               ) : (
@@ -344,6 +361,9 @@ function InstalarPage() {
               )}
               <p className="mt-2 text-center text-xs text-muted-foreground">
                 Arquivo assinado pela empresa · {APK_SIZE_LABEL}
+              </p>
+              <p className="mt-1 text-center text-xs text-muted-foreground">
+                Ao baixar, o link de ativação é copiado sozinho — não precisa copiar nada.
               </p>
               <p className="mt-3 text-center text-xs text-muted-foreground">
                 O Android é quem exige o passo de instalação manual (não dá para pular por design do
