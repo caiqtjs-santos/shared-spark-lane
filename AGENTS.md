@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Custom backend clients use `src/lib/backend/database.types.ts` to extend managed generated types with existing backend migrations; never edit generated types or discard query type safety to accommodate schema differences.

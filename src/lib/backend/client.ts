@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
+import type { Database } from "./database.types";
 import { brokeredPreviewStorage } from "@/integrations/supabase/previewAuthStorage";
 import { BACKEND_PUBLISHABLE_KEY, BACKEND_URL, createBackendFetch } from "./config";
 

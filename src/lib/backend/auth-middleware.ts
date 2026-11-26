@@ -1,7 +1,7 @@
 import { createMiddleware } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
+import type { Database } from "./database.types";
 import { BACKEND_PUBLISHABLE_KEY, BACKEND_URL, createBackendFetch } from "./config";
 
 /**
