@@ -1,0 +1,34 @@
+## COFRE em UM VM grátis (Oracle Cloud Always Free) — caminho enxuto.
+## Vaultwarden (cofre) + Caddy (HTTPS automático via Let's Encrypt).
+## O Vaultwarden NÃO expõe porta pública: só o Caddy fala com ele.
+
+services:
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    environment:
+      # true só até cadastrar o time; depois mude pra false e suba de novo.
+      SIGNUPS_ALLOWED: "${VW_SIGNUPS_ALLOWED:-true}"
+      # Gere com:  docker run --rm vaultwarden/server /vaultwarden hash
+      ADMIN_TOKEN: "${VW_ADMIN_TOKEN}"
+      DOMAIN: "https://${DOMINIO}"
+    volumes:
+      - ./vw-data:/data
+    # sem 'ports': fica acessível só dentro da rede do Docker (pro Caddy)
+
+  caddy:
+    image: caddy:2
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO: "${DOMINIO}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy-data:/data
+      - ./caddy-config:/config
+    depends_on:
+      - vaultwarden
