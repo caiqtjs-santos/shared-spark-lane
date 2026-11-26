@@ -1,0 +1,35 @@
+## FASE 2 — Acesso remoto legítimo aos Androids (plano B)
+## Só subir DEPOIS que a Fase 1 (cofre) estiver no ar e se ainda fizer falta.
+## iPhone NÃO entra aqui (trava da Apple).
+
+services:
+  # Servidor de sinalização/ID do RustDesk
+  hbbs:
+    image: rustdesk/rustdesk-server:latest
+    container_name: rustdesk-hbbs
+    restart: unless-stopped
+    command: hbbs
+    volumes:
+      - ./data:/root
+    ports:
+      - "21115:21115"
+      - "21116:21116"
+      - "21116:21116/udp"
+      - "21118:21118"
+    depends_on:
+      - hbbr
+
+  # Servidor de relay (quando não dá conexão direta)
+  hbbr:
+    image: rustdesk/rustdesk-server:latest
+    container_name: rustdesk-hbbr
+    restart: unless-stopped
+    command: hbbr
+    volumes:
+      - ./data:/root
+    ports:
+      - "21117:21117"
+      - "21119:21119"
+
+# MeshCentral (painel de dispositivos) está no docker-compose.yml da raiz,
+# junto com o Vaultwarden, pra subir pelo mesmo Coolify.

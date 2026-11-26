@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient, queryOptions } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
@@ -134,9 +134,16 @@ function PainelPage() {
               {data.role === "ti" ? "Time de TI" : "Sem acesso ao painel"}
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={handleSignOut}>
-            Sair
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link to="/cofre">
+              <Button variant="outline" size="sm">
+                🔐 Cofre de senhas
+              </Button>
+            </Link>
+            <Button variant="outline" size="sm" onClick={handleSignOut}>
+              Sair
+            </Button>
+          </div>
         </div>
       </header>
 
