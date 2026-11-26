@@ -84,11 +84,18 @@ function CofrePage() {
               Funcionalidade nova · a senha deixa de ficar presa num celular
             </p>
           </div>
-          <Link to="/painel">
-            <Button variant="outline" size="sm">
-              ← Voltar ao painel
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/pessoas-cofre">
+              <Button variant="outline" size="sm">
+                👤 Pessoas e aparelhos
+              </Button>
+            </Link>
+            <Link to="/painel">
+              <Button variant="outline" size="sm">
+                ← Painel
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 

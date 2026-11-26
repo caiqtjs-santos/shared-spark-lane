@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedCofreRouteImport } from './routes/_authenticated/cofre'
 import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated/painel'
+import { Route as AuthenticatedPessoasCofreRouteImport } from './routes/_authenticated/pessoas-cofre'
 import { Route as InstalarTokenRouteImport } from './routes/instalar/$token'
 import { Route as AuthenticatedTiEnterpriseCallbackRouteImport } from './routes/_authenticated/ti/enterprise-callback'
 import { Route as ApiPublicAgentCommandsRouteImport } from './routes/api/public/agent/commands'
@@ -48,6 +49,12 @@ const AuthenticatedPainelRoute = AuthenticatedPainelRouteImport.update({
   path: '/painel',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPessoasCofreRoute =
+  AuthenticatedPessoasCofreRouteImport.update({
+    id: '/pessoas-cofre',
+    path: '/pessoas-cofre',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const InstalarTokenRoute = InstalarTokenRouteImport.update({
   id: '/instalar/$token',
   path: '/instalar/$token',
@@ -101,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/cofre': typeof AuthenticatedCofreRoute
   '/painel': typeof AuthenticatedPainelRoute
+  '/pessoas-cofre': typeof AuthenticatedPessoasCofreRoute
   '/instalar/$token': typeof InstalarTokenRoute
   '/ti/enterprise-callback': typeof AuthenticatedTiEnterpriseCallbackRoute
   '/api/public/agent/commands': typeof ApiPublicAgentCommandsRoute
@@ -116,6 +124,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/cofre': typeof AuthenticatedCofreRoute
   '/painel': typeof AuthenticatedPainelRoute
+  '/pessoas-cofre': typeof AuthenticatedPessoasCofreRoute
   '/instalar/$token': typeof InstalarTokenRoute
   '/ti/enterprise-callback': typeof AuthenticatedTiEnterpriseCallbackRoute
   '/api/public/agent/commands': typeof ApiPublicAgentCommandsRoute
@@ -133,6 +142,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/cofre': typeof AuthenticatedCofreRoute
   '/_authenticated/painel': typeof AuthenticatedPainelRoute
+  '/_authenticated/pessoas-cofre': typeof AuthenticatedPessoasCofreRoute
   '/instalar/$token': typeof InstalarTokenRoute
   '/_authenticated/ti/enterprise-callback': typeof AuthenticatedTiEnterpriseCallbackRoute
   '/api/public/agent/commands': typeof ApiPublicAgentCommandsRoute
@@ -150,6 +160,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/cofre'
     | '/painel'
+    | '/pessoas-cofre'
     | '/instalar/$token'
     | '/ti/enterprise-callback'
     | '/api/public/agent/commands'
@@ -165,6 +176,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/cofre'
     | '/painel'
+    | '/pessoas-cofre'
     | '/instalar/$token'
     | '/ti/enterprise-callback'
     | '/api/public/agent/commands'
@@ -181,6 +193,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/cofre'
     | '/_authenticated/painel'
+    | '/_authenticated/pessoas-cofre'
     | '/instalar/$token'
     | '/_authenticated/ti/enterprise-callback'
     | '/api/public/agent/commands'
@@ -241,6 +254,13 @@ declare module '@tanstack/react-router' {
       path: '/painel'
       fullPath: '/painel'
       preLoaderRoute: typeof AuthenticatedPainelRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/pessoas-cofre': {
+      id: '/_authenticated/pessoas-cofre'
+      path: '/pessoas-cofre'
+      fullPath: '/pessoas-cofre'
+      preLoaderRoute: typeof AuthenticatedPessoasCofreRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/instalar/$token': {
@@ -312,12 +332,14 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedCofreRoute: typeof AuthenticatedCofreRoute
   AuthenticatedPainelRoute: typeof AuthenticatedPainelRoute
+  AuthenticatedPessoasCofreRoute: typeof AuthenticatedPessoasCofreRoute
   AuthenticatedTiEnterpriseCallbackRoute: typeof AuthenticatedTiEnterpriseCallbackRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCofreRoute: AuthenticatedCofreRoute,
   AuthenticatedPainelRoute: AuthenticatedPainelRoute,
+  AuthenticatedPessoasCofreRoute: AuthenticatedPessoasCofreRoute,
   AuthenticatedTiEnterpriseCallbackRoute:
     AuthenticatedTiEnterpriseCallbackRoute,
 }
