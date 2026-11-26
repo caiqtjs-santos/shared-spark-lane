@@ -77,3 +77,14 @@ Um funcionário pode ter mais de um aparelho. O modelo é POR PESSOA:
 - `pessoas` — funcionário (entidade principal); a conta do cofre vive aqui.
 - `aparelhos` — 1 pessoa → N aparelhos (apelido, plataforma android/ios/outro).
 - RLS: só o TI gerencia. Aditivo (não mexe em `devices`). Aplicar só com autorização.
+
+## CAMINHO PRINCIPAL (atualizado): um VM grátis na Oracle Cloud
+Foco enxuto: em vez de 2 servidores pagos (borda BR + cofre DE / WireGuard),
+usamos UM VM Always Free da Oracle (São Paulo) com Vaultwarden + Caddy (HTTPS
+automático). Grátis, gerenciado pelo navegador, sem instalar nada no PC.
+Passo a passo: `cofre/oracle/README.md`.
+
+ARQUIVADO (fora do caminho crítico, só se um dia precisar):
+- dois servidores + WireGuard (cofre/borda/, cofre/provisioning/)
+- MeshCentral e RustDesk (acesso remoto Android — Fase 2)
+- Headwind MDM (Fase 3)

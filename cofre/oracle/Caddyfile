@@ -1,0 +1,6 @@
+# Caddy faz HTTPS automático (Let's Encrypt) para o domínio e repassa pro
+# Vaultwarden. O {$DOMINIO} vem da variável de ambiente (ver docker-compose).
+{$DOMINIO} {
+	encode gzip
+	reverse_proxy vaultwarden:80
+}

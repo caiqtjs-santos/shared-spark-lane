@@ -1,0 +1,6 @@
+# Dados do cofre e segredos — NUNCA versionar
+vw-data/
+caddy-data/
+caddy-config/
+backups/
+.env
