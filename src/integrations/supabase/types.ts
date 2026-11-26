@@ -21,7 +21,7 @@ export type Database = {
           id: string
           mode: string
           reason: string
-          requested_by_user_id: string | null
+          requested_by_user_id: string
           started_at: string
           status: string
         }
@@ -31,7 +31,7 @@ export type Database = {
           id?: string
           mode: string
           reason: string
-          requested_by_user_id?: string | null
+          requested_by_user_id: string
           started_at?: string
           status?: string
         }
@@ -41,7 +41,7 @@ export type Database = {
           id?: string
           mode?: string
           reason?: string
-          requested_by_user_id?: string | null
+          requested_by_user_id?: string
           started_at?: string
           status?: string
         }
@@ -109,7 +109,6 @@ export type Database = {
           android_management_device_name: string | null
           battery_level: number | null
           created_at: string
-          device_owner: boolean
           device_secret: string | null
           enrolled_at: string | null
           enrolled_by_user_id: string | null
@@ -120,7 +119,6 @@ export type Database = {
           model: string
           name: string
           owner_user_id: string | null
-          professional_name: string | null
           push_token: string | null
         }
         Insert: {
@@ -131,7 +129,6 @@ export type Database = {
           android_management_device_name?: string | null
           battery_level?: number | null
           created_at?: string
-          device_owner?: boolean
           device_secret?: string | null
           enrolled_at?: string | null
           enrolled_by_user_id?: string | null
@@ -142,7 +139,6 @@ export type Database = {
           model: string
           name: string
           owner_user_id?: string | null
-          professional_name?: string | null
           push_token?: string | null
         }
         Update: {
@@ -153,7 +149,6 @@ export type Database = {
           android_management_device_name?: string | null
           battery_level?: number | null
           created_at?: string
-          device_owner?: boolean
           device_secret?: string | null
           enrolled_at?: string | null
           enrolled_by_user_id?: string | null
@@ -164,7 +159,6 @@ export type Database = {
           model?: string
           name?: string
           owner_user_id?: string | null
-          professional_name?: string | null
           push_token?: string | null
         }
         Relationships: []
