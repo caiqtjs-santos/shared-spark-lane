@@ -60,3 +60,14 @@ Isso é padrão de stalkerware — fora do escopo.
 ## Reaproveitar o shared-spark-lane
 Painel React + gateways Supabase já feitos viram a tela de administração por cima
 do Vaultwarden (quem acessa o quê, auditoria) — em vez do controle oculto de celular.
+
+## Modelo de dados: 1 pessoa, N aparelhos
+Um funcionário pode ter mais de um aparelho. O modelo é POR PESSOA:
+- **Cofre (Vaultwarden):** 1 pessoa = 1 conta. A mesma conta sincroniza em todos os
+  aparelhos dela ao mesmo tempo (2 celulares, iPhone, navegador). Multi-aparelho é
+  nativo — esquecer um aparelho não trava, a conta está nos outros.
+- **Acesso remoto (Fase 2):** relação 1 pessoa -> N aparelhos. Cada aparelho tem seu
+  registro próprio, todos vinculados à mesma pessoa. (iPhone não entra no controle.)
+- Isso INVERTE o modelo antigo do app, que era por aparelho (registerDevice). Se um
+  dia houver tabela de pessoas/aparelhos, usar pessoa como entidade principal e
+  aparelhos como lista filha.

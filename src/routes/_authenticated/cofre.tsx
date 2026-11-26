@@ -102,6 +102,12 @@ function CofrePage() {
             O desenho, os scripts e as chaves já estão prontos — falta só contratar
             os servidores.
           </p>
+          <p className="mt-3 rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+            👤 <strong className="text-foreground">1 pessoa, vários aparelhos:</strong>{" "}
+            cada funcionário tem <strong className="text-foreground">uma conta</strong>{" "}
+            que funciona em todos os aparelhos dele ao mesmo tempo — dois celulares,
+            iPhone, navegador. Esquecer um aparelho não trava: a conta está nos outros.
+          </p>
         </section>
 
         {/* Arquitetura */}
