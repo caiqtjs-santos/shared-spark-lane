@@ -71,3 +71,9 @@ Um funcionário pode ter mais de um aparelho. O modelo é POR PESSOA:
 - Isso INVERTE o modelo antigo do app, que era por aparelho (registerDevice). Se um
   dia houver tabela de pessoas/aparelhos, usar pessoa como entidade principal e
   aparelhos como lista filha.
+
+### Tabelas (migration não aplicada)
+`supabase/migrations/20261126120000_pessoas_aparelhos.sql`:
+- `pessoas` — funcionário (entidade principal); a conta do cofre vive aqui.
+- `aparelhos` — 1 pessoa → N aparelhos (apelido, plataforma android/ios/outro).
+- RLS: só o TI gerencia. Aditivo (não mexe em `devices`). Aplicar só com autorização.
