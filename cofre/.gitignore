@@ -1,0 +1,16 @@
+# NUNCA versionar dados dos serviços — contêm o cofre inteiro e segredos
+vaultwarden-data/
+meshcentral-data/
+fase2-acesso-remoto/data/
+
+# Segredos
+.env
+*.env
+!.env.example
+
+# Lixo de SO
+Thumbs.db
+.DS_Store
+
+# Segredos gerados (chaves SSH e WireGuard) - NUNCA versionar
+secrets/

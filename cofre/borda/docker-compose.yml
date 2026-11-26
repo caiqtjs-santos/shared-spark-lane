@@ -1,0 +1,19 @@
+## SERVIDOR A — BORDA (público, Finlândia)
+## Único servidor com IP público. Recebe todo o tráfego, faz HTTPS e
+## repassa pro cofre pelo túnel WireGuard (IP 10.8.0.2).
+## NÃO guarda senha nenhuma — se for invadido, não há cofre aqui.
+
+services:
+  proxy:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: npm-borda
+    restart: unless-stopped
+    ports:
+      - "80:80"      # HTTP (redireciona pra HTTPS)
+      - "443:443"    # HTTPS público
+      - "81:81"      # painel de admin do NPM (feche no firewall; use via SSH)
+    volumes:
+      - ./data:/data
+      - ./letsencrypt:/etc/letsencrypt
+# No painel do NPM, cada domínio (cofre./mesh.) aponta como Proxy Host para
+# o cofre pelo túnel: http://10.8.0.2:8080 (Vaultwarden) e :8081 (MeshCentral).

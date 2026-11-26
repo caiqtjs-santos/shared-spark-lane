@@ -1,0 +1,31 @@
+## SERVIDOR B — COFRE (privado, Alemanha/Suíça)
+## NÃO expõe porta nenhuma pra internet. Só escuta no túnel WireGuard
+## (interface 10.8.0.2). Quem fala com ele é só a Borda.
+## Firewall do servidor: permitir só a porta do WireGuard (vinda do IP da Borda)
+## e o SSH. Nada de 80/443 abertos aqui.
+
+services:
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    environment:
+      SIGNUPS_ALLOWED: "${VW_SIGNUPS_ALLOWED:-true}"
+      ADMIN_TOKEN: "${VW_ADMIN_TOKEN}"
+      DOMAIN: "https://${DOMINIO_COFRE}"
+    volumes:
+      - ./vaultwarden-data:/data
+    ports:
+      # Escuta SÓ na interface do túnel WireGuard, nunca em 0.0.0.0
+      - "10.8.0.2:8080:80"
+
+  meshcentral:
+    image: ghcr.io/ylianst/meshcentral:latest
+    container_name: meshcentral
+    restart: unless-stopped
+    environment:
+      HOSTNAME: "${DOMINIO_MESH}"
+    volumes:
+      - ./meshcentral-data:/opt/meshcentral/meshcentral-data
+    ports:
+      - "10.8.0.2:8081:443"
