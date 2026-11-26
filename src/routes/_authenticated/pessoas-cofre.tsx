@@ -67,6 +67,7 @@ function PessoasCofrePage() {
 
   const [nome, setNome] = useState("");
   const [codigo, setCodigo] = useState("");
+  const [busca, setBusca] = useState("");
 
   const addPessoa = useMutation({
     mutationFn: async () => {
@@ -175,9 +176,28 @@ function PessoasCofrePage() {
           </p>
         )}
 
+        {/* Busca */}
+        {data && !data.migracaoFaltando && data.pessoas.length > 0 && (
+          <Input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por nome ou código…"
+            className="max-w-sm"
+          />
+        )}
+
         {/* Lista */}
         <section className="flex flex-col gap-3">
-          {data?.pessoas.map((p) => (
+          {data?.pessoas
+            .filter((p) => {
+              const q = busca.trim().toLowerCase();
+              if (!q) return true;
+              return (
+                p.nome.toLowerCase().includes(q) ||
+                (p.codigo ?? "").toLowerCase().includes(q)
+              );
+            })
+            .map((p) => (
             <PessoaCard
               key={p.id}
               pessoa={p}
@@ -251,6 +271,19 @@ function PessoaCard({
     onSuccess: onMudou,
   });
 
+  const alternarAtivo = useMutation({
+    mutationFn: async () => {
+      const { error } = await db
+        .from("pessoas")
+        .update({ ativo: !pessoa.ativo })
+        .eq("id", pessoa.id);
+      if (error) throw error;
+    },
+    onSuccess: onMudou,
+    onError: (e: unknown) =>
+      toast.error("Não mudou: " + (e instanceof Error ? e.message : "erro")),
+  });
+
   const emoji: Record<Aparelho["plataforma"], string> = {
     android: "🤖",
     ios: "🍎",
@@ -258,18 +291,30 @@ function PessoaCard({
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div className={`rounded-xl border border-border bg-card p-4 ${pessoa.ativo ? "" : "opacity-60"}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="font-display text-sm">{pessoa.nome}</h3>
+          <h3 className="font-display text-sm">
+            {pessoa.nome}
+            {!pessoa.ativo && (
+              <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[11px] font-normal text-muted-foreground">
+                inativo
+              </span>
+            )}
+          </h3>
           <p className="text-xs text-muted-foreground">
             {pessoa.codigo ? `código ${pessoa.codigo} · ` : ""}
             {pessoa.cofre_conta ? `cofre: ${pessoa.cofre_conta}` : "sem conta no cofre ainda"}
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={onRemover}>
-          Remover
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={() => alternarAtivo.mutate()}>
+            {pessoa.ativo ? "Inativar" : "Ativar"}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onRemover}>
+            Remover
+          </Button>
+        </div>
       </div>
 
       {/* Convite pro cofre */}

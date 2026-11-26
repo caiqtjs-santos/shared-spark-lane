@@ -55,6 +55,7 @@ async function requireTi(db: ReturnType<typeof admin>, authHeader: string | null
 async function inviteToCofre(
   db: ReturnType<typeof admin>,
   payload: { pessoaId?: string; email?: string },
+  tiUserId: string,
 ) {
   const pessoaId = (payload.pessoaId ?? "").trim();
   const email = (payload.email ?? "").trim().toLowerCase();
@@ -101,6 +102,13 @@ async function inviteToCofre(
     .eq("id", pessoaId);
   if (uErr) throw new AppError("Convite feito, mas não salvou a conta: " + uErr.message);
 
+  // Auditoria (LGPD): registra quem concedeu acesso ao cofre e para quem.
+  await db.from("audit_log").insert({
+    event_type: "cofre_convite",
+    user_id: tiUserId,
+    details: { pessoaId, cofre_conta: email, simulated },
+  });
+
   return { pessoaId, cofreConta: email, simulated };
 }
 
@@ -119,12 +127,14 @@ Deno.serve(async (req: Request) => {
 
   const db = admin();
   try {
-    await requireTi(db, req.headers.get("authorization"));
+    const tiUserId = await requireTi(db, req.headers.get("authorization"));
     switch (action) {
       case "health":
         return json({ data: { ok: true, cofreConfigurado: Boolean(COFRE_ADMIN_URL) } });
       case "inviteToCofre":
-        return json({ data: await inviteToCofre(db, payload as { pessoaId?: string; email?: string }) });
+        return json({
+          data: await inviteToCofre(db, payload as { pessoaId?: string; email?: string }, tiUserId),
+        });
       default:
         return json({ error: `Ação desconhecida: ${action}` }, 400);
     }
