@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/lib/backend/client";
+import { convidarPessoaCofre } from "@/lib/cofre.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -205,6 +207,23 @@ function PessoaCard({
 }) {
   const [apelido, setApelido] = useState("");
   const [plataforma, setPlataforma] = useState<Aparelho["plataforma"]>("android");
+  const [email, setEmail] = useState("");
+  const convidarFn = useServerFn(convidarPessoaCofre);
+
+  const convidarCofre = useMutation({
+    mutationFn: async () => convidarFn({ data: { pessoaId: pessoa.id, email: email.trim() } }),
+    onSuccess: (r: { simulated: boolean }) => {
+      toast.success(
+        r.simulated
+          ? "Conta registrada (modo simulado — o cofre ainda não está no ar)."
+          : "Convite enviado no cofre.",
+      );
+      setEmail("");
+      onMudou();
+    },
+    onError: (e: unknown) =>
+      toast.error("Não convidou: " + (e instanceof Error ? e.message : "erro")),
+  });
 
   const addAparelho = useMutation({
     mutationFn: async () => {
@@ -252,6 +271,36 @@ function PessoaCard({
           Remover
         </Button>
       </div>
+
+      {/* Convite pro cofre */}
+      {pessoa.cofre_conta ? (
+        <p className="mt-2 inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs text-primary">
+          🔐 no cofre: {pessoa.cofre_conta}
+        </p>
+      ) : (
+        <form
+          className="mt-2 flex flex-wrap items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!email.trim()) {
+              toast.error("Informe o e-mail da conta do cofre.");
+              return;
+            }
+            convidarCofre.mutate();
+          }}
+        >
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="e-mail da conta no cofre"
+            className="h-8 min-w-[180px] flex-1"
+          />
+          <Button type="submit" size="sm" disabled={convidarCofre.isPending}>
+            {convidarCofre.isPending ? "Convidando…" : "🔐 Convidar pro cofre"}
+          </Button>
+        </form>
+      )}
 
       {/* Aparelhos */}
       <div className="mt-3 flex flex-col gap-1">

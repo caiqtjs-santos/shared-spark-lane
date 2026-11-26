@@ -22,7 +22,7 @@ export async function callGateway<T = unknown>(
   //    x-device-secret, passados em `extraHeaders`.
   opts: {
     forwardAuth?: boolean;
-    fn?: "gateway" | "gateway-link" | "gateway-agent";
+    fn?: "gateway" | "gateway-link" | "gateway-agent" | "gateway-cofre";
     extraHeaders?: Record<string, string>;
   } = {},
 ): Promise<T> {
