@@ -124,7 +124,9 @@ export const registerDevice = createServerFn({ method: "POST" })
       deviceName: string;
       professionalName: string;
       enrollmentToken: string;
-      accessToken: string;
+      // Opcional: a Edge Function "gateway" antiga não devolve este campo; o
+      // access_token é lido da lista de aparelhos (o banco o gera no cadastro).
+      accessToken?: string;
     }>(
       "registerDevice",
       { deviceName: data.deviceName, professionalName: data.professionalName },

@@ -177,10 +177,10 @@ function TiView({ data }: { data: Workspace }) {
   const [professionalName, setProfessionalName] = useState("");
   const [newDeviceName, setNewDeviceName] = useState("Celular corporativo");
   const [lastRegistered, setLastRegistered] = useState<{
+    deviceId: string;
     deviceName: string;
     professionalName: string;
     enrollmentToken: string;
-    accessToken: string;
   } | null>(null);
 
   const installLink = (token: string) =>
@@ -195,16 +195,16 @@ function TiView({ data }: { data: Workspace }) {
   const register = useMutation({
     mutationFn: useServerFn(registerDevice),
     onSuccess: (res: {
+      deviceId: string;
       deviceName: string;
       professionalName: string;
       enrollmentToken: string;
-      accessToken: string;
     }) => {
       setLastRegistered({
+        deviceId: res.deviceId,
         deviceName: res.deviceName,
         professionalName: res.professionalName,
         enrollmentToken: res.enrollmentToken,
-        accessToken: res.accessToken,
       });
       setProfessionalName("");
       toast.success("Aparelho cadastrado. São dois links: um para instalar, um para acessar.");
@@ -255,6 +255,12 @@ function TiView({ data }: { data: Workspace }) {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  // O link de acesso vem do access_token do aparelho na lista (o banco gera no
+  // cadastro). Assim não dependemos do retorno da Edge Function "gateway".
+  const lastAccessToken = lastRegistered
+    ? (data.devices.find((d) => d.id === lastRegistered.deviceId)?.access_token ?? null)
+    : null;
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
@@ -344,22 +350,29 @@ function TiView({ data }: { data: Workspace }) {
                 Quem tem este link vê e controla o aparelho. Não abra no celular gerenciado e só
                 repasse para quem deve ter acesso.
               </p>
-              <div className="mt-2 flex items-center gap-2">
-                <input
-                  readOnly
-                  value={accessLink(lastRegistered.accessToken)}
-                  onFocus={(e) => e.currentTarget.select()}
-                  className="w-full truncate rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs"
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => copy(accessLink(lastRegistered.accessToken), "Link de acesso copiado.")}
-                >
-                  Copiar
-                </Button>
-              </div>
+              {lastAccessToken ? (
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={accessLink(lastAccessToken)}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="w-full truncate rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => copy(accessLink(lastAccessToken), "Link de acesso copiado.")}
+                  >
+                    Copiar
+                  </Button>
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Gerando o link de acesso... ele também fica na lista de aparelhos abaixo, em
+                  "Copiar link de acesso".
+                </p>
+              )}
             </div>
           </div>
         )}
