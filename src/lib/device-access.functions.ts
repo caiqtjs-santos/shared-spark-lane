@@ -3,11 +3,11 @@ import { callGateway } from "@/lib/backend/gateway.server";
 import { z } from "zod";
 
 /**
- * Acesso do PROFISSIONAL ao próprio aparelho, SEM login (decisão de
- * 20/10/2026 no roadmap.md). A autenticação é a posse do token do link
- * /instalar/<token>. As operações privilegiadas rodam na Edge Function
- * "gateway-link" do Supabase (decisão de 24/10/2026) - aqui só validamos a
- * entrada e repassamos; cada chamada revalida o token no servidor.
+ * Acesso ao aparelho pelo DONO do link de acesso, SEM login. A autenticação é
+ * a posse do access_token do link /acesso/<token> (decisão de 27/11/2026: é um
+ * token SEPARADO do link de instalação, então o segredo de acesso nunca fica
+ * no celular gerenciado). As operações privilegiadas rodam na Edge Function
+ * "gateway-link"; cada chamada revalida o token no servidor.
  */
 
 function parseInput<T extends z.ZodTypeAny>(schema: T, input: unknown): z.infer<T> {
@@ -39,7 +39,7 @@ export const getDeviceByToken = createServerFn({ method: "GET" })
         reason: string;
         started_at: string;
       } | null;
-    }>("getDevice", { token: data.token }, LINK);
+    }>("getDeviceAccess", { token: data.token }, LINK);
   });
 
 /** Inicia o acesso ao aparelho, com motivo registrado (sem usuário logado). */

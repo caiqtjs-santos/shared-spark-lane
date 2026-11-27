@@ -2,14 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
 /**
- * O app Android troca o token de ativação por um segredo permanente do
- * aparelho. Corresponde ao "único aceite" do onboarding.
+ * O app Android troca o token de ativação (enrollment_token) por um segredo
+ * permanente do aparelho. Corresponde ao "único aceite" do onboarding.
  *
- * O token NÃO é apagado: depois da ativação ele continua sendo o link
- * permanente do profissional (/instalar/<token> abre o painel de acesso
- * remoto - decisão de 20/10/2026). Para esse link não virar uma forma de
- * roubar o aparelho, a troca por device_secret só vale UMA vez: com o
- * aparelho já ativo, um novo enrollment é recusado.
+ * Decisão de 27/11/2026: o enrollment_token é só o LINK DE INSTALAÇÃO — depois
+ * de ativo ele NÃO dá acesso à tela (o acesso é o access_token, em
+ * /acesso/<token>, que fica com o dono). A troca por device_secret só vale UMA
+ * vez: com o aparelho já ativo, um novo enrollment é recusado.
  *
  * A gravação privilegiada roda na Edge Function "gateway-agent" (decisão de
  * 24/10/2026): aqui só validamos a entrada e repassamos.

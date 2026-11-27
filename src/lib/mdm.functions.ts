@@ -73,7 +73,7 @@ export const getWorkspace = createServerFn({ method: "GET" })
       supabase
         .from("devices")
         .select(
-          "id, name, model, enrollment_status, enrollment_token, professional_name, device_owner, last_seen_at, battery_level, enrolled_at, created_at",
+          "id, name, model, enrollment_status, enrollment_token, access_token, professional_name, device_owner, last_seen_at, battery_level, enrolled_at, created_at",
         )
         .order("created_at", { ascending: false }),
       supabase
@@ -100,8 +100,8 @@ export const getWorkspace = createServerFn({ method: "GET" })
 /**
  * O TI cadastra o aparelho e recebe UM link. Decisão de 20/10/2026 no
  * roadmap.md: o profissional não tem login - só o nome (texto livre) fica
- * gravado no aparelho. O link (enrollment_token) ativa o aparelho e, depois,
- * dá acesso ao painel remoto, autenticado pela posse do próprio token.
+ * gravado no aparelho. São dois links: o enrollment_token (instalar no
+ * celular) e o access_token (ver/controlar, em /acesso/<token>).
  */
 export const registerDevice = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -124,6 +124,7 @@ export const registerDevice = createServerFn({ method: "POST" })
       deviceName: string;
       professionalName: string;
       enrollmentToken: string;
+      accessToken: string;
     }>(
       "registerDevice",
       { deviceName: data.deviceName, professionalName: data.professionalName },

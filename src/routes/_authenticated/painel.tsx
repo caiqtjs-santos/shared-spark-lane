@@ -180,10 +180,13 @@ function TiView({ data }: { data: Workspace }) {
     deviceName: string;
     professionalName: string;
     enrollmentToken: string;
+    accessToken: string;
   } | null>(null);
 
   const installLink = (token: string) =>
     typeof window !== "undefined" ? `${window.location.origin}/instalar/${token}` : "";
+  const accessLink = (token: string) =>
+    typeof window !== "undefined" ? `${window.location.origin}/acesso/${token}` : "";
   const copy = (text: string, done: string) => {
     navigator.clipboard?.writeText(text);
     toast.success(done);
@@ -191,14 +194,20 @@ function TiView({ data }: { data: Workspace }) {
 
   const register = useMutation({
     mutationFn: useServerFn(registerDevice),
-    onSuccess: (res: { deviceName: string; professionalName: string; enrollmentToken: string }) => {
+    onSuccess: (res: {
+      deviceName: string;
+      professionalName: string;
+      enrollmentToken: string;
+      accessToken: string;
+    }) => {
       setLastRegistered({
         deviceName: res.deviceName,
         professionalName: res.professionalName,
         enrollmentToken: res.enrollmentToken,
+        accessToken: res.accessToken,
       });
       setProfessionalName("");
-      toast.success("Aparelho cadastrado. Abra o link no celular para ativar.");
+      toast.success("Aparelho cadastrado. São dois links: um para instalar, um para acessar.");
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -252,8 +261,10 @@ function TiView({ data }: { data: Workspace }) {
       <section className="rounded-2xl border border-border bg-card p-6 md:col-span-2">
         <h2 className="font-display text-base">Cadastrar aparelho</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Você gera um único link: abre no celular que vai ser acessado, dá o aceite e instala o
-          app. O mesmo link serve ao profissional para acessar o aparelho depois, sem login.
+          O cadastro gera <strong>dois links separados</strong>: o de <strong>instalação</strong>,
+          que vai no celular (baixar e ativar o app), e o de <strong>acesso</strong>, que fica com
+          quem vai ver o aparelho. Quem tem o link de acesso é quem acessa — ele nunca é aberto no
+          celular.
         </p>
 
         <form
@@ -299,29 +310,56 @@ function TiView({ data }: { data: Workspace }) {
         </form>
 
         {lastRegistered && (
-          <div className="mt-5 rounded-lg border border-primary/40 bg-primary/5 p-4">
+          <div className="mt-5 space-y-4 rounded-lg border border-primary/40 bg-primary/5 p-4">
             <p className="text-sm font-medium text-foreground">
-              Link de {lastRegistered.professionalName} · {lastRegistered.deviceName}
+              {lastRegistered.professionalName} · {lastRegistered.deviceName}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Abra no celular para dar o aceite e instalar o app. Depois, é o mesmo link que o
-              profissional usa para acessar o aparelho remotamente — sem login.
-            </p>
-            <div className="mt-2 flex items-center gap-2">
-              <input
-                readOnly
-                value={installLink(lastRegistered.enrollmentToken)}
-                onFocus={(e) => e.currentTarget.select()}
-                className="w-full truncate rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs"
-              />
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => copy(installLink(lastRegistered.enrollmentToken), "Link copiado.")}
-              >
-                Copiar
-              </Button>
+
+            <div>
+              <p className="text-xs font-semibold text-foreground">1. Link de instalação (no celular)</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Abra este no próprio celular para dar o aceite e instalar o app. Ele só instala.
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  readOnly
+                  value={installLink(lastRegistered.enrollmentToken)}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="w-full truncate rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => copy(installLink(lastRegistered.enrollmentToken), "Link de instalação copiado.")}
+                >
+                  Copiar
+                </Button>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-foreground">2. Link de acesso (guarde com você)</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Quem tem este link vê e controla o aparelho. Não abra no celular gerenciado e só
+                repasse para quem deve ter acesso.
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  readOnly
+                  value={accessLink(lastRegistered.accessToken)}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="w-full truncate rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => copy(accessLink(lastRegistered.accessToken), "Link de acesso copiado.")}
+                >
+                  Copiar
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -415,9 +453,11 @@ function TiView({ data }: { data: Workspace }) {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => copy(installLink(d.enrollment_token ?? ""), "Link copiado.")}
+                        onClick={() =>
+                          copy(installLink(d.enrollment_token ?? ""), "Link de instalação copiado.")
+                        }
                       >
-                        Copiar link de ativação
+                        Copiar link de instalação
                       </Button>
                       <Button
                         variant="ghost"
@@ -432,6 +472,15 @@ function TiView({ data }: { data: Workspace }) {
                         Ativar sem o app (apenas teste)
                       </Button>
                     </>
+                  )}
+                  {d.enrollment_status !== "revogado" && d.access_token && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copy(accessLink(d.access_token), "Link de acesso copiado.")}
+                    >
+                      Copiar link de acesso
+                    </Button>
                   )}
                   {d.enrollment_status !== "revogado" && enterpriseStatus.data?.configured && (
                     <Button
