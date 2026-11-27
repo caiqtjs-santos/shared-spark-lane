@@ -55,6 +55,7 @@ export function PhoneMirror({
   onEndSession,
   starting,
   stopping,
+  lastSeenAt,
 }: {
   source: MirrorSource;
   deviceName: string;
@@ -63,6 +64,9 @@ export function PhoneMirror({
   onEndSession: () => void;
   starting: boolean;
   stopping: boolean;
+  /** Último sinal do aparelho (heartbeat). Usado para dizer, na espera, se ele
+   *  está offline ou só ainda não começou a enviar a tela. */
+  lastSeenAt?: string | null | undefined;
 }) {
   const [reason, setReason] = useState("Esqueci o celular em casa e preciso liberar um pagamento.");
   const [mode, setMode] = useState<MirrorMode>("controle");
@@ -97,7 +101,7 @@ export function PhoneMirror({
         {activeSession ? (
           <>
             <div className="flex-1">
-              <ScreenView source={source} mode={activeSession.mode} />
+              <ScreenView source={source} mode={activeSession.mode} lastSeenAt={lastSeenAt} />
               <p className="mt-2 text-center text-[11px] text-muted-foreground">
                 {deviceName} · modo {activeSession.mode === "controle" ? "controle" : "visualização"}{" "}
                 · iniciada às{" "}
@@ -159,7 +163,22 @@ export function PhoneMirror({
  * mais rápido que isso só aumenta custo de Storage sem ganho visível, dado
  * que o aparelho também só captura poucos frames por segundo do lado dele.
  */
-function ScreenView({ source, mode }: { source: MirrorSource; mode: MirrorMode }) {
+/** Online se o último heartbeat foi há menos de 45s (o agente bate a cada 15s). */
+function aparelhoOnline(lastSeenAt?: string | null): boolean {
+  if (!lastSeenAt) return false;
+  const t = Date.parse(lastSeenAt);
+  return Number.isFinite(t) && Date.now() - t < 45_000;
+}
+
+function ScreenView({
+  source,
+  mode,
+  lastSeenAt,
+}: {
+  source: MirrorSource;
+  mode: MirrorMode;
+  lastSeenAt?: string | null | undefined;
+}) {
   const frame = useQuery({
     queryKey: source.queryKey,
     queryFn: source.fetchFrameUrl,
@@ -241,9 +260,26 @@ function ScreenView({ source, mode }: { source: MirrorSource; mode: MirrorMode }
           }}
         />
       ) : (
-        <div className="flex h-full items-center justify-center p-4 text-center text-[11px] text-white/60">
-          Aguardando o aparelho começar a enviar a tela... (ele precisa estar com a permissão de
-          captura de tela concedida)
+        <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center text-[11px] text-white/70">
+          {aparelhoOnline(lastSeenAt) ? (
+            <>
+              <span className="font-medium text-white/90">
+                Aparelho online, mas ainda não enviou a tela.
+              </span>
+              <span>
+                No celular, confirme o pedido &quot;Começar a gravar&quot; para liberar a captura.
+                Se não apareceu, abra o app no aparelho.
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="font-medium text-white/90">Aparelho parece offline.</span>
+              <span>
+                O app de gestão não está respondendo no celular. Abra o app no aparelho e tire-o da
+                otimização de bateria; a tela aparece aqui sozinha.
+              </span>
+            </>
+          )}
         </div>
       )}
     </div>

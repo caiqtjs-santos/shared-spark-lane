@@ -57,7 +57,14 @@ function AcessoPage() {
     retry: false,
     // Enquanto o aparelho não ativou no celular, conferimos sozinho a cada 4s,
     // para o painel abrir assim que a instalação terminar.
-    refetchInterval: (query) => (query.state.data?.status === "pendente" ? 4_000 : false),
+    // Pendente: confere rápido até ativar. Ativo: atualiza a cada 10s para
+    // refletir online/offline do aparelho e sessão encerrada em outro lugar.
+    refetchInterval: (query) => {
+      const st = query.state.data?.status;
+      if (st === "pendente") return 4_000;
+      if (st === "ativo") return 10_000;
+      return false;
+    },
   });
 
   const fetchFrameUrl = useServerFn(getDeviceFrameUrlByToken);
@@ -142,6 +149,7 @@ function AcessoPage() {
                 }
                 starting={start.isPending}
                 stopping={stop.isPending}
+                lastSeenAt={data.lastSeenAt}
               />
             </>
           )}
