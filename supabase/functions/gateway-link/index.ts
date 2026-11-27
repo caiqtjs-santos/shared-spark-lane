@@ -4,9 +4,13 @@
 // deploy. Mesma ideia (decisão de 24/10/2026, ver roadmap.md): roda com
 // service_role injetado pelo Supabase, sem segredo manual no Lovable.
 //
-// Autenticação: a POSSE do token do link (devices.enrollment_token, exposto
-// em /instalar/<token>) — mesmo modelo do device_secret do app. Cada ação
-// revalida o token. Função pública (verify_jwt off).
+// Autenticação: a POSSE do token do link. Desde 27/11/2026 há DOIS links:
+//  - enrollment_token: vai no celular (/instalar/<token>) — só instala/ativa.
+//    Ações de instalação (getDevice, registerAceite) usam este.
+//  - access_token: fica com o dono (/acesso/<token>) — ver/controlar a tela.
+//    Ações de acesso (getDeviceAccess, startSession, endSession, getFrameUrl,
+//    sendInput) exigem ESTE. Assim o segredo de acesso nunca fica no aparelho
+//    gerenciado. Cada ação revalida o token. Função pública (verify_jwt off).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
@@ -36,12 +40,19 @@ async function logAudit(
   await db.from("audit_log").insert({ ...entry, user_id: null });
 }
 
-async function deviceFromToken(db: ReturnType<typeof admin>, token: string, requireActive: boolean) {
+// `coluna` escolhe o link: "enrollment_token" (instalação, no celular) ou
+// "access_token" (acesso, com o dono). Ver cabeçalho do arquivo.
+async function deviceFromToken(
+  db: ReturnType<typeof admin>,
+  token: string,
+  requireActive: boolean,
+  coluna: "enrollment_token" | "access_token" = "access_token",
+) {
   if (!token || token.length < 8) throw new AppError("Link inválido ou já usado.");
   const { data: device } = await db
     .from("devices")
     .select("id, name, model, professional_name, enrollment_status, battery_level, last_seen_at")
-    .eq("enrollment_token", token)
+    .eq(coluna, token)
     .maybeSingle();
   if (!device) throw new AppError("Link inválido ou já usado.");
   if (device.enrollment_status === "revogado")
@@ -51,8 +62,23 @@ async function deviceFromToken(db: ReturnType<typeof admin>, token: string, requ
   return device;
 }
 
+/** Instalação (link do celular): só nome/modelo/status, pelo enrollment_token. */
 async function getDevice(db: ReturnType<typeof admin>, p: { token: string }) {
-  const device = await deviceFromToken(db, p.token, false);
+  const device = await deviceFromToken(db, p.token, false, "enrollment_token");
+  return {
+    name: device.name,
+    model: device.model,
+    professionalName: device.professional_name,
+    status: device.enrollment_status,
+    batteryLevel: null,
+    lastSeenAt: null,
+    activeSession: null,
+  };
+}
+
+/** Acesso (link do dono): nome/status + sessão ativa, pelo access_token. */
+async function getDeviceAccess(db: ReturnType<typeof admin>, p: { token: string }) {
+  const device = await deviceFromToken(db, p.token, false, "access_token");
   const { data: session } = await db
     .from("access_sessions")
     .select("id, mode, reason, started_at")
@@ -71,7 +97,7 @@ async function getDevice(db: ReturnType<typeof admin>, p: { token: string }) {
 }
 
 async function registerAceite(db: ReturnType<typeof admin>, p: { token: string }) {
-  const device = await deviceFromToken(db, p.token, false);
+  const device = await deviceFromToken(db, p.token, false, "enrollment_token");
   if (device.enrollment_status !== "pendente") return { ok: true };
   const { data: previous } = await db
     .from("audit_log")
@@ -192,6 +218,8 @@ Deno.serve(async (req) => {
     switch (action) {
       case "getDevice":
         return json({ data: await getDevice(db, payload) });
+      case "getDeviceAccess":
+        return json({ data: await getDeviceAccess(db, payload) });
       case "registerAceite":
         return json({ data: await registerAceite(db, payload) });
       case "startSession":

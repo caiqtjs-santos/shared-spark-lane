@@ -9,7 +9,7 @@ import { toast } from "sonner";
  * Espelho do celular, compartilhado entre as telas que mostram o acesso
  * remoto. Só a parte visual vive aqui; de onde vêm os dados (frame e envio de
  * toque) entra por `source`, para cada tela usar a sua forma de autenticar:
- * hoje a página pública /instalar/$token (por token do link), e quem for
+ * hoje a página pública /acesso/$token (por token do link), e quem for
  * autenticado no painel pode usar getDeviceFrameUrl/sendDeviceInput.
  */
 

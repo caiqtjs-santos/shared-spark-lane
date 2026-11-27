@@ -8,14 +8,17 @@ type Devices = Omit<GeneratedDevices, "Row" | "Insert" | "Update"> & {
   Row: GeneratedDevices["Row"] & {
     professional_name: string | null;
     device_owner: boolean;
+    access_token: string;
   };
   Insert: GeneratedDevices["Insert"] & {
     professional_name?: string | null;
     device_owner?: boolean;
+    access_token?: string;
   };
   Update: GeneratedDevices["Update"] & {
     professional_name?: string | null;
     device_owner?: boolean;
+    access_token?: string;
   };
 };
 

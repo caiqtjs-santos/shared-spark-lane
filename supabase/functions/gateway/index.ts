@@ -133,7 +133,10 @@ async function registerDevice(
   userId: string,
   p: { deviceName: string; professionalName: string },
 ) {
+  // Dois tokens distintos (decisão de 27/11/2026): enrollmentToken vai para o
+  // celular (instalar/ativar); accessToken fica com o dono (ver/controlar).
   const enrollmentToken = crypto.randomUUID();
+  const accessToken = crypto.randomUUID();
   const { data: device, error } = await db
     .from("devices")
     .insert({
@@ -142,6 +145,7 @@ async function registerDevice(
       model: "A confirmar na ativação",
       enrollment_status: "pendente",
       enrollment_token: enrollmentToken,
+      access_token: accessToken,
     })
     .select("id")
     .single();
@@ -159,6 +163,7 @@ async function registerDevice(
     deviceName: p.deviceName,
     professionalName: p.professionalName,
     enrollmentToken,
+    accessToken,
   };
 }
 

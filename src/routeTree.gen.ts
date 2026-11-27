@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedCofreRouteImport } from './routes/_authenticated/cofre'
 import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated/painel'
 import { Route as AuthenticatedPessoasCofreRouteImport } from './routes/_authenticated/pessoas-cofre'
+import { Route as AcessoTokenRouteImport } from './routes/acesso/$token'
 import { Route as InstalarTokenRouteImport } from './routes/instalar/$token'
 import { Route as AuthenticatedTiEnterpriseCallbackRouteImport } from './routes/_authenticated/ti/enterprise-callback'
 import { Route as ApiPublicAgentCommandsRouteImport } from './routes/api/public/agent/commands'
@@ -55,6 +56,11 @@ const AuthenticatedPessoasCofreRoute =
     path: '/pessoas-cofre',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AcessoTokenRoute = AcessoTokenRouteImport.update({
+  id: '/acesso/$token',
+  path: '/acesso/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InstalarTokenRoute = InstalarTokenRouteImport.update({
   id: '/instalar/$token',
   path: '/instalar/$token',
@@ -109,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/cofre': typeof AuthenticatedCofreRoute
   '/painel': typeof AuthenticatedPainelRoute
   '/pessoas-cofre': typeof AuthenticatedPessoasCofreRoute
+  '/acesso/$token': typeof AcessoTokenRoute
   '/instalar/$token': typeof InstalarTokenRoute
   '/ti/enterprise-callback': typeof AuthenticatedTiEnterpriseCallbackRoute
   '/api/public/agent/commands': typeof ApiPublicAgentCommandsRoute
@@ -125,6 +132,7 @@ export interface FileRoutesByTo {
   '/cofre': typeof AuthenticatedCofreRoute
   '/painel': typeof AuthenticatedPainelRoute
   '/pessoas-cofre': typeof AuthenticatedPessoasCofreRoute
+  '/acesso/$token': typeof AcessoTokenRoute
   '/instalar/$token': typeof InstalarTokenRoute
   '/ti/enterprise-callback': typeof AuthenticatedTiEnterpriseCallbackRoute
   '/api/public/agent/commands': typeof ApiPublicAgentCommandsRoute
@@ -143,6 +151,7 @@ export interface FileRoutesById {
   '/_authenticated/cofre': typeof AuthenticatedCofreRoute
   '/_authenticated/painel': typeof AuthenticatedPainelRoute
   '/_authenticated/pessoas-cofre': typeof AuthenticatedPessoasCofreRoute
+  '/acesso/$token': typeof AcessoTokenRoute
   '/instalar/$token': typeof InstalarTokenRoute
   '/_authenticated/ti/enterprise-callback': typeof AuthenticatedTiEnterpriseCallbackRoute
   '/api/public/agent/commands': typeof ApiPublicAgentCommandsRoute
@@ -161,6 +170,7 @@ export interface FileRouteTypes {
     | '/cofre'
     | '/painel'
     | '/pessoas-cofre'
+    | '/acesso/$token'
     | '/instalar/$token'
     | '/ti/enterprise-callback'
     | '/api/public/agent/commands'
@@ -177,6 +187,7 @@ export interface FileRouteTypes {
     | '/cofre'
     | '/painel'
     | '/pessoas-cofre'
+    | '/acesso/$token'
     | '/instalar/$token'
     | '/ti/enterprise-callback'
     | '/api/public/agent/commands'
@@ -194,6 +205,7 @@ export interface FileRouteTypes {
     | '/_authenticated/cofre'
     | '/_authenticated/painel'
     | '/_authenticated/pessoas-cofre'
+    | '/acesso/$token'
     | '/instalar/$token'
     | '/_authenticated/ti/enterprise-callback'
     | '/api/public/agent/commands'
@@ -209,6 +221,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  AcessoTokenRoute: typeof AcessoTokenRoute
   InstalarTokenRoute: typeof InstalarTokenRoute
   ApiPublicAgentCommandsRoute: typeof ApiPublicAgentCommandsRoute
   ApiPublicAgentDeviceInfoRoute: typeof ApiPublicAgentDeviceInfoRoute
@@ -262,6 +275,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/pessoas-cofre'
       preLoaderRoute: typeof AuthenticatedPessoasCofreRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/acesso/$token': {
+      id: '/acesso/$token'
+      path: '/acesso/$token'
+      fullPath: '/acesso/$token'
+      preLoaderRoute: typeof AcessoTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/instalar/$token': {
       id: '/instalar/$token'
@@ -351,6 +371,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  AcessoTokenRoute: AcessoTokenRoute,
   InstalarTokenRoute: InstalarTokenRoute,
   ApiPublicAgentCommandsRoute: ApiPublicAgentCommandsRoute,
   ApiPublicAgentDeviceInfoRoute: ApiPublicAgentDeviceInfoRoute,

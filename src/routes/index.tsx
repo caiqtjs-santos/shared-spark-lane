@@ -60,7 +60,7 @@ function Home() {
         {[
           {
             t: "Aparelho entregue pronto",
-            d: "O TI gera um único link, abre no celular e dá o aceite. O profissional recebe o aparelho pronto — sem login, só o link.",
+            d: "O TI gera dois links: um para instalar no celular e um para acessar o aparelho depois. Quem tem o link de acesso é quem vê o aparelho — sem login.",
           },
           {
             t: "Acesso sob demanda",
