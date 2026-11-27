@@ -42,6 +42,17 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
+if grep -q "COLE_O_HASH_AQUI" .env; then
+  echo "ERRO: troque COLE_O_HASH_AQUI pelo hash do token de admin (ver README)."
+  exit 1
+fi
+# O hash argon2 tem "$": sem aspas simples o docker compose corta o valor.
+if grep -Eq '^VW_ADMIN_TOKEN=[^'"'"']*\$' .env; then
+  echo "ERRO: coloque o VW_ADMIN_TOKEN entre aspas simples no .env:"
+  echo "      VW_ADMIN_TOKEN='\$argon2id\$...'"
+  exit 1
+fi
+
 echo ">> 5/5 Subindo o cofre (Vaultwarden + Caddy)..."
 docker compose --env-file .env up -d
 echo

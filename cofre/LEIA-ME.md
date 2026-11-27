@@ -53,7 +53,7 @@ Uma VPS barata (R$ 20–30/mês: Contabo, Hostinger, ou Oracle Cloud free) fica 
 
 1. **ADMIN_TOKEN do Vaultwarden** — gere um token e cole no compose:
    ```
-   docker run --rm vaultwarden/server /vaultwarden hash
+   docker run --rm -it vaultwarden/server /vaultwarden hash
    ```
    Depois o painel de admin fica em `/admin`.
 2. **Fechar cadastros** — depois de cadastrar todo mundo, mude

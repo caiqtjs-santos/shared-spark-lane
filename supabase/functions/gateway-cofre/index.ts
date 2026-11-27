@@ -49,6 +49,35 @@ async function requireTi(db: ReturnType<typeof admin>, authHeader: string | null
 }
 
 /**
+ * Abre uma sessão no painel admin do Vaultwarden e devolve o cookie `VW_ADMIN=<jwt>`.
+ *
+ * O painel não aceita o token direto nas chamadas: o Vaultwarden (src/api/admin.rs,
+ * guarda `AdminToken`) só aceita o cookie VW_ADMIN com um JWT emitido pelo login
+ * (POST /admin, formulário `token=<token em texto puro>`). Por isso COFRE_ADMIN_TOKEN
+ * é o token em TEXTO PURO, o mesmo que se digita na tela /admin — não o hash argon2
+ * que fica no .env do servidor.
+ */
+async function loginAdminCofre(base: string): Promise<string> {
+  const res = await fetch(`${base}/admin`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ token: COFRE_ADMIN_TOKEN }).toString(),
+    redirect: "manual",
+  });
+  const setCookie = res.headers.get("set-cookie") ?? "";
+  const jwt = /VW_ADMIN=([^;]+)/.exec(setCookie)?.[1];
+  if (!jwt) {
+    if (res.status === 429) {
+      throw new AppError("O cofre bloqueou por excesso de tentativas. Tente em alguns minutos.");
+    }
+    throw new AppError(
+      "O cofre não aceitou o token de admin. Confira o segredo COFRE_ADMIN_TOKEN (texto puro, não o hash).",
+    );
+  }
+  return `VW_ADMIN=${jwt}`;
+}
+
+/**
  * Convida uma pessoa para o cofre. Se os segredos do Vaultwarden não estiverem
  * configurados (modo stub), só registra a conta e devolve simulated=true.
  */
@@ -76,16 +105,11 @@ async function inviteToCofre(
   let simulated = true;
   if (COFRE_ADMIN_URL && COFRE_ADMIN_TOKEN) {
     // Cofre configurado: convida de verdade no Vaultwarden.
-    // Endpoint de convite do painel admin do Vaultwarden.
-    const res = await fetch(`${COFRE_ADMIN_URL.replace(/\/$/, "")}/admin/invite`, {
+    const base = COFRE_ADMIN_URL.replace(/\/$/, "");
+    const sessao = await loginAdminCofre(base);
+    const res = await fetch(`${base}/admin/invite`, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        // O painel admin do Vaultwarden autentica pelo cookie VW_ADMIN; aqui
-        // mandamos o token. Ajustar conforme a versão do Vaultwarden no deploy.
-        Cookie: `VW_ADMIN=${COFRE_ADMIN_TOKEN}`,
-        Authorization: `Bearer ${COFRE_ADMIN_TOKEN}`,
-      },
+      headers: { "content-type": "application/json", Cookie: sessao },
       body: JSON.stringify({ email }),
     });
     if (!res.ok) {
