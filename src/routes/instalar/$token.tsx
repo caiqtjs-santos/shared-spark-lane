@@ -112,6 +112,29 @@ function InstalarPage() {
     window.location.href = intentUrl;
   }
 
+  // Pacote do navegador atual, para abrir direto a tela "Permitir instalar
+  // deste app" DELE. Se não reconhecer, cai no Chrome (mais comum) e, se ainda
+  // assim não resolver, o fallback abre esta mesma página de volta.
+  function navegadorPackage() {
+    const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+    if (/SamsungBrowser/i.test(ua)) return "com.sec.android.app.sbrowser";
+    if (/EdgA/i.test(ua)) return "com.microsoft.emmx";
+    if (/OPR|Opera/i.test(ua)) return "com.opera.browser";
+    if (/Firefox|FxiOS/i.test(ua)) return "org.mozilla.firefox";
+    return "com.android.chrome";
+  }
+
+  // Abre a tela do Android que libera instalar apps de fora da Play Store.
+  // É o passo que o Android exige depois de baixar o APK — aqui vira 1 toque.
+  function permitirInstalacao() {
+    const fallback = encodeURIComponent(window.location.href);
+    const url =
+      `intent://${navegadorPackage()}#Intent;scheme=package;` +
+      `action=android.settings.MANAGE_UNKNOWN_APP_SOURCES;` +
+      `S.browser_fallback_url=${fallback};end`;
+    window.location.href = url;
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-md">
@@ -278,9 +301,30 @@ function InstalarPage() {
                 Ao baixar, o link de ativação é copiado sozinho — não precisa copiar nada.
               </p>
 
-              <div className="mt-5 rounded-lg border border-border bg-muted/40 px-3 py-3 text-xs text-muted-foreground">
+              {isAndroid && (
+                <div className="mt-5 rounded-lg border border-primary/40 bg-primary/5 p-3">
+                  <p className="text-xs font-medium text-foreground">
+                    O Android bloqueou a instalação?
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    É normal: o Android exige liberar a instalação de apps de fora da Play Store.
+                    Toque no botão para abrir essa tela, ligue a chave do seu navegador e volte para
+                    abrir o arquivo baixado.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-2 w-full"
+                    onClick={permitirInstalacao}
+                  >
+                    Permitir instalação deste navegador
+                  </Button>
+                </div>
+              )}
+
+              <div className="mt-3 rounded-lg border border-border bg-muted/40 px-3 py-3 text-xs text-muted-foreground">
                 <p className="font-medium text-foreground">
-                  Se o arquivo baixar e desaparecer sozinho
+                  Se o arquivo baixar e sumir sozinho
                 </p>
                 <p className="mt-1">
                   É o Play Protect apagando um app que ele não conhece. No aplicativo Play Store,
