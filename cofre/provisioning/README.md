@@ -40,7 +40,7 @@ scp -i secrets/ssh/borda_ed25519 provisioning/00-blindagem.sh root@IP_DA_BORDA:/
 ### Fase 1 — Cofre
 9. No **COFRE**: gerar o token de admin do Vaultwarden:
    ```
-   docker run --rm vaultwarden/server /vaultwarden hash
+   docker run --rm -it vaultwarden/server /vaultwarden hash
    ```
    Copie o hash para `VW_ADMIN_TOKEN` no `.env` (copie de `.env.example`).
 10. No **COFRE**, pasta `cofre/`: `docker compose --env-file ../.env up -d`

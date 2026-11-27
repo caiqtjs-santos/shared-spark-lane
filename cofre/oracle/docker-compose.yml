@@ -10,7 +10,7 @@ services:
     environment:
       # true só até cadastrar o time; depois mude pra false e suba de novo.
       SIGNUPS_ALLOWED: "${VW_SIGNUPS_ALLOWED:-true}"
-      # Gere com:  docker run --rm vaultwarden/server /vaultwarden hash
+      # Gere com:  docker run --rm -it vaultwarden/server /vaultwarden hash
       ADMIN_TOKEN: "${VW_ADMIN_TOKEN}"
       DOMAIN: "https://${DOMINIO}"
     volumes:

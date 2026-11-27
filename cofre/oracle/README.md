@@ -25,8 +25,10 @@ No VM:
 cd cofre/oracle
 cp .env.example .env
 nano .env        # preencha DOMINIO e VW_ADMIN_TOKEN
-# gerar o VW_ADMIN_TOKEN:
-#   docker run --rm vaultwarden/server /vaultwarden hash   (cole o hash no .env)
+# gerar o VW_ADMIN_TOKEN (pede a senha de admin que você escolheu):
+#   docker run --rm -it vaultwarden/server /vaultwarden hash
+# cole o hash ENTRE ASPAS SIMPLES no .env:  VW_ADMIN_TOKEN='$argon2id$...'
+# (o hash tem "$"; sem as aspas o docker compose corta o valor)
 sudo bash oracle-setup.sh
 ```
 Em 1-2 min: **https://cofre.seudominio.com** no ar (cadeado válido).
@@ -50,7 +52,9 @@ os backups pra fora do VM de vez em quando.
 ## 6. Ligar ao app (depois)
 No app (Supabase → Edge Functions → gateway-cofre → Secrets), cadastre:
 - `COFRE_ADMIN_URL` = `https://cofre.seudominio.com`
-- `COFRE_ADMIN_TOKEN` = o mesmo valor do VW_ADMIN_TOKEN
+- `COFRE_ADMIN_TOKEN` = a **senha de admin em texto puro** (a que você digita em
+  `/admin`), **não** o hash do `.env`. A função faz o login no painel com ela e usa a
+  sessão para convidar.
 Aí o botão "Convidar pro cofre" do painel passa de simulado pra real.
 
 ## Checklist de segurança
