@@ -28,14 +28,13 @@ import kotlinx.coroutines.launch
  * Quando aparece uma sessão ativa (visualização OU controle - os dois
  * modos precisam de captura de tela; só o modo controle usa o
  * RemoteAccessibilityService além disso) e a captura ainda não está
- * rodando, traz a MainActivity para frente para ela pedir a permissão de
- * MediaProjection - isso NÃO pode ser feito por um serviço em segundo
- * plano sozinho, o Android exige uma Activity em primeiro plano para
- * mostrar esse diálogo de consentimento (ver MainActivity.onNewIntent e
- * requestScreenCapturePermission). Trazer o app para frente sem avisar é
- * um comportamento visível e esperado aqui - é o próprio diálogo do
- * sistema que serve de consentimento, consistente com o princípio de
- * transparência do projeto.
+ * rodando, mostra uma notificação de ALTA prioridade "Toque para liberar o
+ * acesso à tela". Tocar nela abre a MainActivity, que dispara o diálogo de
+ * permissão de MediaProjection. ANTES o serviço tentava abrir a Activity
+ * sozinho (startActivity em segundo plano), mas o Android 10+ BLOQUEIA isso
+ * silenciosamente - por isso a tela de captura nunca aparecia. A notificação
+ * (que a pessoa toca) é o caminho permitido e continua sendo o consentimento
+ * visível do próprio sistema, consistente com o princípio de transparência.
  */
 class SessionWatcherService : Service() {
 
@@ -43,7 +42,7 @@ class SessionWatcherService : Service() {
     private lateinit var deviceStore: DeviceStore
     private val apiClient = ApiClient()
     private lateinit var commandExecutor: DeviceCommandExecutor
-    private var lastSessionActive = false
+    private var lastState = ""
 
     override fun onCreate() {
         super.onCreate()
@@ -74,9 +73,6 @@ class SessionWatcherService : Service() {
                 apiClient.heartbeat(deviceId, deviceSecret, readBatteryLevel())
                 val session = apiClient.fetchActiveSession(deviceId, deviceSecret)
                 updateNotification(session)
-                if (session != null && !ScreenCaptureService.isRunning) {
-                    requestCaptureViaMainActivity()
-                }
             } catch (e: Exception) {
                 // Rede instável é esperado (celular fora do wifi, sem sinal
                 // momentaneamente) - não derruba o serviço, só tenta de novo
@@ -98,31 +94,49 @@ class SessionWatcherService : Service() {
     }
 
     /**
-     * Abre a MainActivity por cima do que a pessoa estiver usando, com o
-     * extra EXTRA_AUTO_REQUEST_CAPTURE, para ela já disparar o diálogo de
-     * permissão de captura de tela sozinha (ver MainActivity.onNewIntent).
-     * FLAG_ACTIVITY_NEW_TASK é obrigatório para iniciar uma Activity a
-     * partir de um Service.
+     * PendingIntent que abre a MainActivity já pedindo a permissão de captura
+     * (EXTRA_AUTO_REQUEST_CAPTURE). É disparado quando a PESSOA toca a
+     * notificação "Toque para liberar o acesso à tela" - um toque é um gesto
+     * do usuário, então o Android deixa abrir a Activity e mostrar o diálogo
+     * de MediaProjection (ao contrário de startActivity em segundo plano).
      */
-    private fun requestCaptureViaMainActivity() {
+    private fun captureRequestPendingIntent(): PendingIntent {
         val intent = Intent(this, MainActivity::class.java).apply {
             putExtra(MainActivity.EXTRA_AUTO_REQUEST_CAPTURE, true)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
-        startActivity(intent)
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+            (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
+        return PendingIntent.getActivity(this, 1, intent, flags)
     }
 
     private fun updateNotification(session: ApiClient.ActiveSession?) {
         val manager = getSystemService(NotificationManager::class.java)
-        if (session != null) {
-            manager.notify(NOTIFICATION_ID_ACTIVE, buildActiveSessionNotification(session))
-            manager.cancel(NOTIFICATION_ID_IDLE)
-            lastSessionActive = true
-        } else if (lastSessionActive) {
-            manager.cancel(NOTIFICATION_ID_ACTIVE)
-            manager.notify(NOTIFICATION_ID_IDLE, buildIdleNotification())
-            lastSessionActive = false
+        val state = when {
+            session == null -> "idle"
+            ScreenCaptureService.isRunning -> "capturando"
+            else -> "precisa_captura"
         }
+        when (state) {
+            "idle" -> {
+                manager.cancel(NOTIFICATION_ID_ACTIVE)
+                manager.notify(NOTIFICATION_ID_IDLE, buildIdleNotification())
+            }
+            "capturando" -> {
+                manager.cancel(NOTIFICATION_ID_IDLE)
+                manager.notify(NOTIFICATION_ID_ACTIVE, buildActiveSessionNotification(session!!))
+            }
+            "precisa_captura" -> {
+                manager.cancel(NOTIFICATION_ID_IDLE)
+                // Re-emite o alerta (heads-up) só ao ENTRAR neste estado, para
+                // não incomodar a cada 15s. A notificação é ongoing, então
+                // continua visível para a pessoa tocar quando puder.
+                if (lastState != "precisa_captura") {
+                    manager.notify(NOTIFICATION_ID_ACTIVE, buildCaptureNeededNotification(session!!))
+                }
+            }
+        }
+        lastState = state
     }
 
     private fun readBatteryLevel(): Int? {
@@ -160,6 +174,24 @@ class SessionWatcherService : Service() {
             .setContentIntent(openAppIntent())
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+    }
+
+    private fun buildCaptureNeededNotification(session: ApiClient.ActiveSession): Notification {
+        ensureChannel()
+        val pi = captureRequestPendingIntent()
+        val modo = if (session.mode == "controle") "controle" else "visualização"
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Toque para liberar o acesso à tela")
+            .setContentText("Pedido de acesso ($modo). Toque para permitir a captura de tela.")
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentIntent(pi)
+            .setFullScreenIntent(pi, true)
+            .addAction(0, "Liberar acesso à tela", pi)
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setOngoing(true)
+            .setAutoCancel(false)
             .build()
     }
 

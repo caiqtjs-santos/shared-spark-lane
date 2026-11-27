@@ -16,6 +16,9 @@
     <!-- Notificação de sessão ativa (obrigatória a partir do Android 13) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Notificação "toque para liberar a captura" em tela cheia / heads-up -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
     <!-- Bateria/status exibidos no painel -->
     <uses-permission android:name="android.permission.BATTERY_STATS" tools:ignore="ProtectedPermissions" />
 
